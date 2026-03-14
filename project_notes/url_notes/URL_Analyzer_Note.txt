@@ -1,0 +1,33 @@
+URL  Analyzer 
+Build a tool that takes a URL and outputs a Risk Score (0-100) using three different methods.
+1. Setup & Config
+
+Action: Import libraries  and add our API keys (VirusTotal, Google Safe Browsing).
+
+2. Path A: Machine Learning 
+
+Action: Load a dataset of known safe/malicious URLs.
+
+Action: Extract features (URL length, number of dots, presence of @).
+
+Action: Train a model (like Random Forest) to predict if the URL is malicious or benign.
+
+3. Path B: Reputation API 
+
+Action: Send the target URL to the VirusTotal API.
+
+Action: Parse the JSON response to count how many security engines flagged it as dangerous.
+
+4. Path C: Heuristics / Rules
+
+Action: Check for typosquatting (e.g., g00gle instead of google).
+
+Action: Check if the URL is just an IP address (e.g., http://192.168.1.1).
+
+Action: Flag unusual top-level domains (like .xyz, .top, .loan).
+
+5. Final Aggregation
+
+Action: Combine the results from Paths A, B, and C using their assigned weights.
+
+Action: Output a final Risk Score (0-100) and a final recommendation (e.g., "Safe", "Suspicious", or "Block").
