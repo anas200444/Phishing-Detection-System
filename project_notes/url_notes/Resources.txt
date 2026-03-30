@@ -1,0 +1,13 @@
+Datasets
+Phishing URL Dataset (Mendeley): A large-scale collection of over 450,000 categorized legitimate and phishing URLs for training and research.
+https://data.mendeley.com/datasets/vfszbj9b36/1
+
+Web Page Phishing Detection (Kaggle)
+https://www.kaggle.com/datasets/shashwatwork/web-page-phishing-detection-dataset
+
+APIs and Tools
+VirusTotal: An analysis tool and API for scanning suspicious files, domains, IPs, and URLs to detect malware and other threats.
+https://www.virustotal.com/gui/home/upload
+1
+urlscan.io: A sandbox service and API that securely browses, scans, and analyzes the behavior and content of targeted websites.
+https://urlscan.io/
