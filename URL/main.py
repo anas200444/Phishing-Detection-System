@@ -39,7 +39,9 @@ def process_user_input(model, scaler, threshold, feature_columns):
             
         url = ensure_url_scheme(url)
         if not is_valid_url_format(url):
-            print("  [!] Invalid URL format.")
+            # Updated error message and example as requested
+            print("  [!] Error: Please enter a valid URL.")
+            print("  [i] Example: https://www.google.com or http://example.org")
             continue
             
         analyze_url_api_first_then_ml(url, model, scaler, threshold, feature_columns)

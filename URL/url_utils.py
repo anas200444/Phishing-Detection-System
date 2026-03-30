@@ -15,7 +15,7 @@ def extract_domain(url: str) -> str:
 def is_valid_url_format(url: str) -> bool:
     try:
         parsed = urlparse(url)
-        return bool(parsed.scheme in ("http", "https") and parsed.netloc)
+        return bool(parsed.scheme in ("http", "https") and parsed.netloc and '.' in parsed.netloc)
     except Exception:
         return False
 
