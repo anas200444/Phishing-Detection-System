@@ -47,6 +47,11 @@ def process_user_input(model, scaler, threshold, feature_columns):
         analyze_url_api_first_then_ml(url, model, scaler, threshold, feature_columns)
 
 def main():
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(script_dir)
+    # --------------------------------------------------------------------------------
+
     if os.path.exists(MODEL_ARTIFACTS_FILE):
         ans = input(f"[*] Found existing model '{MODEL_ARTIFACTS_FILE}'. Load it? (y/n): ").strip().lower()
         if ans == 'y':
