@@ -56,3 +56,4 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             print("\nShutting down system")
             break
+#resourses:https://github.com/shaghayegh-hp/Smishing_Dataset#combined-labeled-smishing-dataset
