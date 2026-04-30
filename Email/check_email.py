@@ -3,7 +3,6 @@ import sys
 import dns.resolver
 import requests
 
-
 script_dir = os.path.dirname(os.path.abspath(__file__))
 BLOCKLIST_FILE = os.path.join(script_dir, "disposable_email_blocklist.txt")
 
@@ -13,10 +12,9 @@ def get_domain_from_email(email):
     except IndexError:
         return None
 
-def check_local_blocklist(domain):
-    """ Static Local Analysis against disposable blocklist."""
+def check_blocklist(domain):
+    """Analysis against disposable blocklist."""
     if not os.path.exists(BLOCKLIST_FILE):
-        print(f"[-] Error: Could not find blocklist at: {BLOCKLIST_FILE}")
         return False
 
     with open(BLOCKLIST_FILE, 'r', encoding='utf-8') as file:
@@ -29,10 +27,8 @@ def check_local_blocklist(domain):
     return domain in blocklist
 
 def check_dns_records(domain):
-    """Authentication Check (SPF/DMARC)."""
     spf_found = False
     dmarc_found = False
-
     try:
         answers = dns.resolver.resolve(domain, 'TXT')
         for rdata in answers:
@@ -41,7 +37,7 @@ def check_dns_records(domain):
                 break
     except Exception:
         pass 
-
+    
     try:
         answers = dns.resolver.resolve(f'_dmarc.{domain}', 'TXT')
         for rdata in answers:
@@ -54,75 +50,108 @@ def check_dns_records(domain):
     return spf_found, dmarc_found
 
 def check_stopforumspam(email):
-    """Global Threat Intelligence Check (Specific Email Address)."""
     url = f"https://api.stopforumspam.org/api?email={email}&json"
-    
-    
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    
+    result = {
+        "is_flagged": False,
+        "appears": 0,
+        "frequency": 0,
+        "confidence": 0,
+        "error": None
     }
 
     try:
         response = requests.get(url, headers=headers, timeout=10)
-        
         if response.status_code == 200:
             data = response.json()
             if data.get("success") == 1:
                 email_data = data.get("email", {})
-                
-                # 'appears' > 0 means the email is logged in their threat database
                 appears = email_data.get("appears", 0)
+                
+                result["appears"] = appears
                 if appears > 0:
-                    frequency = email_data.get("frequency", "unknown")
-                    confidence = email_data.get("confidence", "unknown")
-                    print(f"    [!] ALERT: Email specifically flagged by StopForumSpam!")
-                    print(f"        -> Database appearances: {frequency}")
-                    print(f"        -> Threat Confidence: {confidence}%")
-                    return True
-            return False
+                    result["is_flagged"] = True
+                    result["frequency"] = email_data.get("frequency", 0)
+                    result["confidence"] = email_data.get("confidence", 0)
         else:
-            print(f"[-] API connection failed. HTTP Status: {response.status_code}")
-            return False
+            result["error"] = f"API HTTP Error: {response.status_code}"
+            
     except requests.exceptions.RequestException as e:
-        print(f"[-] Network error while connecting to threat database: {e}")
-        return False
+        result["error"] = "Network connection failed."
     except ValueError:
-        print("[-] Error parsing API response.")
-        return False
+        result["error"] = "Failed to response."
+        
+    return result
 
 def evaluate_email(email):
-    """Master pipeline execution."""
-    print(f"\n[+] Target Acquired: {email}")
     domain = get_domain_from_email(email)
     
     if not domain:
-        return "Invalid Data Format"
+        return {
+            "status": "Please Enter a valid Email",
+            "is_safe": False,
+            "details": ["Invalid email format."]
+        }
 
-  
-    print(" Initiating Blocklist Check...")
-    if check_local_blocklist(domain):
-        return "Phishing / Disposable "
-
-    print("Verifying SPF/DMARC Signatures...")
+    is_disposable = check_blocklist(domain)
     spf, dmarc = check_dns_records(domain)
+    sfs_data = check_stopforumspam(email)
+
+    details = [
+        f"Target Email: {email}",
+        f"Extracted Domain: {domain}"
+    ]
     
-    if not spf and not dmarc:
-        return "Phishing / Suspicious (Authentication Failed: No SPF or DMARC)"
+    is_safe = True
 
-   
-    print("Querying Global Email Threat Intelligence...")
-    if check_stopforumspam(email):
-        return "Phishing / Malicious (Exact Email Match in Threat DB)"
+    if is_disposable:
+        is_safe = False
+        details.append("Domain matches a known temporary email provider.")
+    
+    # 2. DNS Authentication Check
+    if spf and dmarc:
+        details.append("DNS Authentication: (Both SPF and DMARC records found).")
+    elif spf:
+        details.append("DNS Authentication: (SPF found, DMARC missing).")
+    elif dmarc:
+        details.append("DNS Authentication: (DMARC found, SPF missing).")
+    else:
+        is_safe = False
+        details.append("DNS Authentication Failure: Domain lacks proper SPF or DMARC records.")
 
-    return "Legitimate"
+    
+    if sfs_data.get("is_flagged"):
+        is_safe = False
+        details.append(f"Flagged maliciously by Threat Database.")
+        details.append(f"Database Appearances: {sfs_data.get('frequency')}")
+        details.append(f"Threat Confidence: {sfs_data.get('confidence')}%")
+    else:
+        if sfs_data.get("error"):
+            details.append(f"Could not verify ({sfs_data.get('error')}).")
+        else:
+            details.append("Clear (No known threats).")
+
+    # Final Status Verdict
+    status = "LEGITIMATE / SAFE" if is_safe else "PHISHING / MALICIOUS"
+
+    return {
+        "status": status,
+        "is_safe": is_safe,
+        "details": details
+    }
 
 if __name__ == "__main__":
     try:
-        
         user_input = input("\nEnter target email for analysis: ").strip()
         if user_input:
             result = evaluate_email(user_input)
-            print(f"\n*** VERDICT: {result} ***\n" + "-"*40)
+            print(f"\n*** VERDICT: {result['status']} ***")
+            for detail in result['details']:
+                print(f"- {detail}")
+            print("-" * 40)
     except KeyboardInterrupt:
         print("\nExecution terminated.")
         sys.exit(0)

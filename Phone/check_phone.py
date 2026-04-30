@@ -1,90 +1,183 @@
 import requests
 import re
+import phonenumbers
+from phonenumbers import geocoder
 from twilio.rest import Client
-
+from twilio.base.exceptions import TwilioRestException
 
 TWILIO_ACCOUNT_SID = 'ACf6798286da9976d744abfe90e6c43883'
 TWILIO_AUTH_TOKEN = 'e3f3b8526b36580e16b614ca2371adfe'
 
-def format_phone_number(raw_number):
-
+def get_dynamic_country_iso():
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     
-    cleaned_number = re.sub(r'[^\d+]', '', raw_number)
-    return cleaned_number
+    try:
+        res = requests.get("http://ip-api.com/json/", headers=headers, timeout=3)
+        if res.status_code == 200:
+            return res.json().get("countryCode")
+    except Exception:
+        pass
+        
+    try:
+        res = requests.get("https://ipapi.co/json/", headers=headers, timeout=3)
+        if res.status_code == 200:
+            return res.json().get("country_code")
+    except Exception:
+        pass
+        
+    try:
+        res = requests.get("https://ipinfo.io/json", headers=headers, timeout=3)
+        if res.status_code == 200:
+            return res.json().get("country")
+    except Exception:
+        pass
+        
+    return None
+
+def parse_number(raw_number, dynamic_region):
+    
+    clean_number = str(raw_number).strip()
+    
+    
+    if clean_number.startswith('00'):
+        clean_number = '+' + clean_number[2:]
+        
+    
+    if clean_number.startswith('+'):
+        try:
+            parsed = phonenumbers.parse(clean_number, None)
+            if phonenumbers.is_valid_number(parsed):
+                return parsed
+        except phonenumbers.phonenumberutil.NumberParseException:
+            pass
+            
+    if dynamic_region:
+        try:
+            parsed = phonenumbers.parse(clean_number, dynamic_region)
+            if phonenumbers.is_valid_number(parsed):
+                return parsed
+        except phonenumbers.phonenumberutil.NumberParseException:
+            pass
+            
+    #   "US" standard ((XXX) XXX-XXXX format globally)
+    try:
+        parsed = phonenumbers.parse(clean_number, "US")
+        if phonenumbers.is_valid_number(parsed):
+            return parsed
+    except phonenumbers.phonenumberutil.NumberParseException:
+        pass
+        
+    
+    digits_only = re.sub(r'\D', '', clean_number)
+    if digits_only:
+        try:
+            parsed = phonenumbers.parse('+' + digits_only, None)
+            if phonenumbers.is_valid_number(parsed):
+                return parsed
+        except phonenumbers.phonenumberutil.NumberParseException:
+            pass
+            
+    return None
 
 def check_phone_number(raw_phone_number):
-    """
-    Analyzes a phone number and classifies it as 'Phishing' or 'Legitimate'.
-    Checks SkipCalls first, then Twilio.
-    """
+    details = []
     
-    phone_number = format_phone_number(raw_phone_number)
-    print(f"\n[+] Starting analysis for: {phone_number}")
+    dynamic_region = get_dynamic_country_iso()
+    parsed_number = parse_number(raw_phone_number, dynamic_region)
+    
+    if not parsed_number:
+        return {
+            "status": "Please Enter a Valid Phone number",
+            "is_safe": False,
+            "details": [
+                "Country Code Missing or Invalid",
+                "Please include the country code (e.g., +962) "
+            ]
+        }
 
-   
-    print("[-] Step 1: Checking SkipCalls database...")
+    
+    phone_number = phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.E164)
+    
+    
+    country_name = geocoder.description_for_number(parsed_number, "en")
+    if country_name:
+        details.append(f"Detected Country: {country_name}")
+
+    details.insert(0, f"Analyzing formatted number: {phone_number}")
+    is_safe = True
+    status = "LEGITIMATE / SAFE"
+
+    #  Spam Database Check
     try:
         skip_url = f"https://spam.skipcalls.app/check/{phone_number}"
         skip_response = requests.get(skip_url, timeout=5)
-        
-        if skip_response.status_code == 200:
-            data = skip_response.json()
-            
-           
-            if data.get("is_spam") == True:
-                return "Phishing (Reason: Flagged in SkipCalls spam database)"
-            else:
-                print("    -> Number is clean on SkipCalls.")
-    except Exception as e:
-        print(f"    -> SkipCalls connection failed: {e}. Moving to next layer.")
+        if skip_response.status_code == 200 and skip_response.json().get("is_spam") == True:
+            is_safe = False
+            status = "PHISHING / SPAM"
+            details.append("Number is flagged in a spam database.")
+        else:
+            details.append("Clean (No spam records found).")
+    except Exception:
+        details.append("Spam database connection bypassed.")
 
-  
-    print("[-] Step 2: Checking Twilio for telecom risk signals...")
+    # Telecom Carrier Lookup
     try:
         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-        
-   
-        if not phone_number.startswith('+'):
-            print("    -> Warning: Twilio works best with a '+' and country code (E.164 format).")
+        lookup = client.lookups.v2.phone_numbers(phone_number).fetch(fields=['line_type_intelligence', 'sms_pumping_risk'])
 
-        lookup = client.lookups.v2.phone_numbers(phone_number).fetch(
-            fields=['line_type_intelligence', 'sms_pumping_risk']
-        )
+        if hasattr(lookup, 'valid') and lookup.valid is False:
+             return {
+                "status": "Validation Failed",
+                "is_safe": False,
+                "details": ["Number failed network validation checks,Ensure the number is active and formatted correctly."]
+             }
+            
+        if hasattr(lookup, 'national_format') and lookup.national_format:
+            details.append(f"National Format: {lookup.national_format}")
 
-        
         if lookup.line_type_intelligence:
             line_type = lookup.line_type_intelligence.get('type')
-            if line_type == "nonFixedVoip":
-                return "Phishing (Reason: Suspected non-fixed VoIP number)"
+            carrier = lookup.line_type_intelligence.get('carrier_name')
+            
+            if carrier:
+                details.append(f"Carrier: {carrier}")
+                
+            if line_type:
+                details.append(f"Line Type: {line_type.capitalize()}")
+                if line_type.lower() in ["nonfixedvoip", "voip"]:
+                    is_safe = False
+                    if status == "LEGITIMATE / SAFE":
+                        status = "SUSPICIOUS / PHISHING"
+                    details.append("Suspected non-fixed VoIP number (commonly used to mask identity).")
 
-       
         if lookup.sms_pumping_risk:
             risk_score = lookup.sms_pumping_risk.get('risk_score', 0)
             if risk_score > 70: 
-                return f"Phishing (Reason: High Twilio Fraud Risk Score: {risk_score})"
-                
-        print("    -> Twilio analysis complete. No high-risk indicators found.")
+                is_safe = False
+                if status == "LEGITIMATE / SAFE":
+                    status = "PHISHING / FRAUD RISK"
+                details.append(f"Alert: High Fraud Risk Score ({risk_score}/100).")
+            else:
+                details.append(f"Fraud Risk Score: {risk_score}/100 (Acceptable).")
 
-    except Exception as e:
-        print(f"    -> Twilio check failed. Error: {e}")
+    except TwilioRestException as e:
+        if e.status == 404:
+            return {
+                "status": "Please enter a valid phone number",
+                "is_safe": False,
+                "details": ["Number not found or invalid in telecom records."]
+            }
+        details.append("Telecom API check bypassed")
+    except Exception:
+        details.append("Telecom API check bypassed.")
 
+    if is_safe:
+        details.append("No high-risk telecom indicators found.")
 
-    
-    return "Legitimate"
-
-
-if __name__ == "__main__":
-    print("========================================")
-    print("  Phishing Number Classifier Module     ")
-    print("========================================")
-    
-    
-    user_input = input("Enter the phone number to analyze (e.g., +1 (325) 244-7821): ")
-    
-    if user_input.strip():
-        result = check_phone_number(user_input)
-        print("\n========================================")
-        print(f" FINAL RESULT: {result}")
-        print("========================================\n")
-    else:
-        print("No number entered. Exiting.")
+    return {
+        "status": status,
+        "is_safe": is_safe,
+        "details": details
+    }
