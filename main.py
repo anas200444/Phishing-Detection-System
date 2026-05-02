@@ -54,5 +54,13 @@ async def analyze_ip(ip: str = Form(...)):
 async def analyze_phone(phone: str = Form(...)):
     return check_phone.check_phone_number(phone)
 
+@app.get("/url", response_class=HTMLResponse)
+async def url_page(request: Request):
+    return templates.TemplateResponse(request=request, name="url.html")
+
+@app.post("/api/analyze/url")
+async def analyze_url(url: str = Form(...)):
+    return {"status": "success", "received_url": url, "message": "Pending backend integration"}
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8080, reload=True)
