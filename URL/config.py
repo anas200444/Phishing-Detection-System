@@ -11,7 +11,8 @@ VT_HEADERS = {"accept": "application/json", "x-apikey": VT_API_KEY}
 DATASET_FILE = "URL dataset.csv"
 VISUALS_DIR  = "visualizations"
 
-MODEL_ARTIFACTS_FILE = os.path.join(os.path.expanduser("~"), "Desktop", "Phishing_URL_model.pkl")
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_ARTIFACTS_FILE = os.path.join(PROJECT_DIR, "Phishing_URL_model.pkl")
 
 # CONSTANTS & LISTS
 SUSPICIOUS_KEYWORDS = [
