@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>QR Code Scanner</title>
+    <title>Smart QR Code Scanner</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
-    <h1>Scan QR Code for Phishing Detection</h1>
+    <h1>Scan QR Code (URL, Email, or Phone)</h1>
     
     <div id="reader" style="width: 500px; margin: auto;"></div>
     
@@ -14,14 +14,32 @@
 
     <script>
         function onScanSuccess(decodedText, decodedResult) {
-            document.getElementById('result').innerText = "Scanned URL: " + decodedText;
-            
+            document.getElementById('result').innerText = "Scanned Data: " + decodedText;
             html5QrcodeScanner.clear();
 
             let formData = new FormData();
-            formData.append("url", decodedText);
+            let targetApi = "";
+            let textLower = decodedText.toLowerCase();
 
-            fetch("/api/analyze/url", {
+            if (textLower.startsWith("mailto:")) {
+                let emailAddress = decodedText.substring(7);
+                formData.append("email", emailAddress);
+                targetApi = "/api/analyze/email";
+                document.getElementById('result').innerText += "\nDetected: Email -> Sending to Email API...";
+            } 
+            else if (textLower.startsWith("tel:")) {
+                let phoneNumber = decodedText.substring(4);
+                formData.append("phone", phoneNumber);
+                targetApi = "/api/analyze/phone";
+                document.getElementById('result').innerText += "\nDetected: Phone -> Sending to Phone API...";
+            } 
+            else {
+                formData.append("url", decodedText);
+                targetApi = "/api/analyze/url";
+                document.getElementById('result').innerText += "\nDetected: URL -> Sending to URL API...";
+            }
+
+            fetch(targetApi, {
                 method: "POST",
                 body: formData
             })
