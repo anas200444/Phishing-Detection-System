@@ -1,0 +1,65 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart QR Code Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+    <h1>Scan QR Code (URL, Email, or Phone)</h1>
+    
+    <div id="reader" style="width: 500px; margin: auto;"></div>
+    
+    <div id="result" style="margin-top: 20px; font-weight: bold;"></div>
+
+    <script>
+        function onScanSuccess(decodedText, decodedResult) {
+            document.getElementById('result').innerText = "Scanned Data: " + decodedText;
+            html5QrcodeScanner.clear();
+
+            let formData = new FormData();
+            let targetApi = "";
+            let textLower = decodedText.toLowerCase();
+
+            if (textLower.startsWith("mailto:")) {
+                let emailAddress = decodedText.substring(7);
+                formData.append("email", emailAddress);
+                targetApi = "/api/analyze/email";
+                document.getElementById('result').innerText += "\nDetected: Email -> Sending to Email API...";
+            } 
+            else if (textLower.startsWith("tel:")) {
+                let phoneNumber = decodedText.substring(4);
+                formData.append("phone", phoneNumber);
+                targetApi = "/api/analyze/phone";
+                document.getElementById('result').innerText += "\nDetected: Phone -> Sending to Phone API...";
+            } 
+            else {
+                formData.append("url", decodedText);
+                targetApi = "/api/analyze/url";
+                document.getElementById('result').innerText += "\nDetected: URL -> Sending to URL API...";
+            }
+
+            fetch(targetApi, {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').innerText += "\nAnalysis Result: " + JSON.stringify(data);
+            })
+            .catch(error => {
+                console.error("Error:", error);
+            });
+        }
+
+        function onScanFailure(error) {
+        }
+
+        let html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader",
+            { fps: 10, qrbox: {width: 250, height: 250} },
+            false);
+        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    </script>
+</body>
+</html> -->

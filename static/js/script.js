@@ -32,6 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
             
             const isIpPage = window.location.pathname.includes('/ip');
             const isPhonePage = window.location.pathname.includes('/phone');
+            const isUrlPage = window.location.pathname.includes('/url');
             
             let endpoint = "/api/analyze/email";
             let formKey = "email";
@@ -42,6 +43,9 @@ document.addEventListener("DOMContentLoaded", () => {
             } else if (isPhonePage) {
                 endpoint = "/api/analyze/phone";
                 formKey = "phone";
+            } else if (isUrlPage) {
+                endpoint = "/api/analyze/url";
+                formKey = "url";
             }
 
             try {
@@ -69,9 +73,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 statusBadge.textContent = data.status;
 
-                // Only update confidence if the element exists on the page (prevents errors on email page)
+                // Safely handles UI updates while strictly respecting modules that omit confidence scores
                 if (confidenceText) {
-                    confidenceText.textContent = `Confidence: ${data.confidence}`;
+                    if (data.confidence !== undefined) {
+                        confidenceText.textContent = `Confidence: ${data.confidence}`;
+                    } else {
+                        confidenceText.textContent = ""; 
+                    }
                 }
 
                 detailsList.innerHTML = "";

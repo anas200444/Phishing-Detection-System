@@ -10,6 +10,12 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
+# --- NEW FIX: Add the URL folder to the system path ---
+url_dir = os.path.join(current_dir, "URL")
+if url_dir not in sys.path:
+    sys.path.insert(0, url_dir)
+# ------------------------------------------------------
+
 old_ip_folder = os.path.join(current_dir, "IP Address")
 new_ip_folder = os.path.join(current_dir, "IP_Address")
 if os.path.exists(old_ip_folder) and not os.path.exists(new_ip_folder):
@@ -18,9 +24,11 @@ if os.path.exists(old_ip_folder) and not os.path.exists(new_ip_folder):
 from Email import check_email 
 from IP_Address import IP_check 
 from Phone import check_phone 
+from URL import check_url  
 
 app = FastAPI(title="Multi-Vector Analysis Platform")
 
+# ... (Keep the rest of your main.py exactly the same below this) ...
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -41,6 +49,10 @@ async def ip_page(request: Request):
 async def phone_page(request: Request):
     return templates.TemplateResponse(request=request, name="phone.html")
 
+@app.get("/url", response_class=HTMLResponse)
+async def url_page(request: Request):
+    return templates.TemplateResponse(request=request, name="url.html")
+
 # API Analysis Routes
 @app.post("/api/analyze/email")
 async def analyze_email(email: str = Form(...)):
@@ -54,13 +66,9 @@ async def analyze_ip(ip: str = Form(...)):
 async def analyze_phone(phone: str = Form(...)):
     return check_phone.check_phone_number(phone)
 
-@app.get("/url", response_class=HTMLResponse)
-async def url_page(request: Request):
-    return templates.TemplateResponse(request=request, name="url.html")
-
 @app.post("/api/analyze/url")
 async def analyze_url(url: str = Form(...)):
-    return {"status": "success", "received_url": url, "message": "Pending backend integration"}
+    return check_url.evaluate_url(url)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8080, reload=True)

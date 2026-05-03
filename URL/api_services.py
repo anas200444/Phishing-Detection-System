@@ -6,7 +6,6 @@ from config import URLSCAN_HEADERS, VT_HEADERS
 from url_utils import extract_domain
 
 def check_virustotal(target_url: str) -> dict:
-    print("[*] Querying VirusTotal reputation database...")
     url_id = base64.urlsafe_b64encode(target_url.encode()).decode().strip("=")
     vt_endpoint = f"https://www.virustotal.com/api/v3/urls/{url_id}"
 
@@ -19,7 +18,7 @@ def check_virustotal(target_url: str) -> dict:
                 "reputation": attributes.get('reputation', 0)
             }
         elif response.status_code == 404:
-            return {"error": "No previous scan found on VirusTotal for this exact URL."}
+            return { "No previous scan found on VirusTotal for this  URL."}
         else:
             return {"error": f"API Error {response.status_code}: Please verify your VT API key."}
     except requests.exceptions.RequestException as e:
@@ -27,23 +26,22 @@ def check_virustotal(target_url: str) -> dict:
 
 def submit_and_poll_urlscan(target_url: str):
     urlscan_data, scan_uuid = None, None
-    print("[*] Submitting URL to urlscan.io sandbox...")
+    print("Submitting URL to urlscan.io sandbox...")
     payload = {"url": target_url, "visibility": "public"}
 
     try:
         response = requests.post('https://urlscan.io/api/v1/scan/', headers=URLSCAN_HEADERS, data=json.dumps(payload), timeout=15)
         if response.status_code == 400:
-            print("[-] urlscan.io prevented/blocked the scan (Status 400).")
+            print(" urlscan.io blocked the scan ")
             return None, None
         elif response.status_code != 200:
-            print(f"[-] Error submitting to urlscan (Status {response.status_code}): {response.text}")
+            print(f"Error submitting to urlscan (Status {response.status_code}): {response.text}")
             return None, None
 
         submission_data = response.json()
         scan_uuid = submission_data.get('uuid')
         api_endpoint = submission_data.get('api')
-        print(f"[+] Scan submitted successfully. Task UUID: {scan_uuid}")
-        print("[*] Waiting for urlscan.io to process the site (approx. 30-60 seconds)...")
+        print("[*] Waiting for urlscan.io to process the site ")
 
         max_polling_attempts, polling_interval_seconds = 12, 10
         for attempt in range(max_polling_attempts):
@@ -58,13 +56,12 @@ def submit_and_poll_urlscan(target_url: str):
                     print(f"[-] Unexpected error during polling: Status {result_response.status_code}")
                     return None, scan_uuid
             except requests.exceptions.RequestException as e:
-                print(f"[-] Network error during polling: {str(e)}")
+                print(f"[-] Network error  {str(e)}")
                 return None, scan_uuid
-
-        print("[-] Timeout: urlscan.io scan did not finish in time.")
+        print("[-] Timeout")
         return None, scan_uuid
     except requests.exceptions.RequestException as e:
-        print(f"[-] Network error occurred during urlscan submission: {str(e)}")
+        print(f"[-] Network error occurred  {str(e)}")
         return None, None
 
 def display_report(urlscan_data: dict, scan_uuid: str, vt_results: dict, target_url: str):
@@ -93,12 +90,8 @@ def display_report(urlscan_data: dict, scan_uuid: str, vt_results: dict, target_
             gsb_status = f"Flagged as malicious for {target_domain}"
             is_malicious = True
 
-    print("\n" + "=" * 70)
     print(">>> OVERALL VERDICT: MALICIOUS <<<".center(70) if is_malicious else ">>> OVERALL VERDICT: SAFE <<<".center(70))
-    print("=" * 70)
-    print("                     COMBINED URL ANALYSIS REPORT")
-    print("=" * 70)
-    print("\n[ TARGET INFORMATION ]\n" + "-" * 70)
+    print("\n[ TARGET INFORMATION ]\n")
     print(f"Target URL         : {target_url}\nTarget Domain      : {target_domain}")
 
     if urlscan_data:
@@ -106,9 +99,9 @@ def display_report(urlscan_data: dict, scan_uuid: str, vt_results: dict, target_
         print(f"Primary IP         : {page_data.get('ip', 'N/A')}\nHosted Country     : {page_data.get('country', 'N/A')}")
         print(f"Server Name        : {page_data.get('server', 'N/A')}\nISP / ASN          : {page_data.get('asnname', 'Unknown')} ({page_data.get('asn', 'Unknown')})\nTLS/SSL Valid      : {page_data.get('tlsValid', 'Unknown')}")
     else:
-        print("Network Details    : N/A (urlscan.io scan was blocked or failed)")
+        print(" (urlscan.io scan was blocked or failed)")
 
-    print("\n[ VIRUSTOTAL INTELLIGENCE ]\n" + "-" * 70)
+    print("\n[ VIRUSTOTAL  ]\n" )
     if "error" in vt_results:
         print(f"Status             : {vt_results['error']}")
     else:
@@ -118,13 +111,13 @@ def display_report(urlscan_data: dict, scan_uuid: str, vt_results: dict, target_
         print(f"Community Score    : {vt_reputation}\nDetection Ratio    : {vt_malicious_count} out of {total_engines} security vendors flagged the URL as Malicious")
         print(f"Breakdown          : Malicious: {vt_malicious_count} | Suspicious: {vt_suspicious_count} | Clean/Unrated: {harmless + undetected}")
 
-    print("\n[ URLSCAN.IO THREAT INTELLIGENCE ]\n" + "-" * 70)
+    print("\n[ URLSCAN.IO THREAT I ]\n" + "-" * 70)
     if urlscan_data:
         print(f"urlscan.io Verdict : {'[ MALICIOUS ]' if overall_verdicts.get('malicious', False) else '[ CLEAN / UNKNOWN ]'}")
         print(f"Threat Score       : {overall_verdicts.get('score', 0)}\nCategories         : {', '.join(overall_verdicts.get('categories', [])) or 'None detected'}")
         print(f"Threat Tags        : {', '.join(overall_verdicts.get('tags', [])) or 'None detected'}\nGoogle Safe Browsing: {gsb_status}")
         network_lists = urlscan_data.get('lists', {})
-        print("\n[ NETWORK ACTIVITY SUMMARY ]\n" + "-" * 70)
+        print("\n[ NETWORK ACTIVITY  ]\n" + "-" * 70)
         print(f"IPs Contacted      : {len(network_lists.get('ips', []))}\nDomains Reached    : {len(network_lists.get('domains', []))}\nURLs Loaded        : {len(network_lists.get('urls', []))}")
     else:
         print(f"urlscan.io Data    : Ignored / Scan Prevented\nGoogle Safe Browsing: {gsb_status} (No urlscan data)")
