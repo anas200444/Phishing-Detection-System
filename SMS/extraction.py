@@ -1,22 +1,26 @@
 import os
 import sys
 import re
+from pathlib import Path
 
-# System Path Resolution
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
 
-paths_to_add = [
-    parent_dir,
-    os.path.join(parent_dir, "URL"),
-    os.path.join(parent_dir, "IP Address"),
-    os.path.join(parent_dir, "Email"),
-    os.path.join(parent_dir, "Phone")
-]
+current_dir = Path(__file__).resolve().parent
+parent_dir = current_dir.parent
 
-for path in paths_to_add:
-    if path not in sys.path:
-        sys.path.insert(0, path)
+
+if str(current_dir) not in sys.path: sys.path.insert(0, str(current_dir))
+if str(parent_dir) not in sys.path: sys.path.insert(0, str(parent_dir))
+
+#  discover all subdirectories in the parent folder
+# (e.g., "URL", "IP Address", "Email", "Phone", or variations like "IP_check")
+for root, dirs, files in os.walk(parent_dir):
+  
+    if any(part.startswith('.') or part == '__pycache__' for part in Path(root).parts):
+        continue
+    if root not in sys.path:
+        sys.path.insert(0, root)
+
+
 
 URL_MODEL_DATA = None
 
@@ -37,28 +41,28 @@ def load_url_model():
 def check_phone_integration(phone_num):
     try:
         import check_phone
-        return "Phishing" in check_phone.check_phone_number(phone_num)
-    except Exception:
+        result = check_phone.check_phone_number(phone_num)
+        return not result.get("is_safe", True)
+    except Exception as e:
+        print(f"  [!] Phone integration error: {e}")
         return False
 
 def check_email_integration(email_addr):
     try:
         import check_email
-        return "Phishing" in check_email.evaluate_email(email_addr)
-    except Exception:
+        result = check_email.evaluate_email(email_addr)
+        return not result.get("is_safe", True)
+    except Exception as e:
+        print(f"  [!] Email integration error: {e}")
         return False
 
 def check_ip_integration(ip_addr):
     try:
         import IP_check
-        valid_ip = IP_check.validate_ip(ip_addr)
-        if valid_ip:
-            is_malicious, _, _, _ = IP_check.check_virustotal(valid_ip)
-            if is_malicious: return True
-            rdns_found, _ = IP_check.check_reverse_dns(valid_ip)
-            if not rdns_found: return True 
-        return False
-    except Exception:
+        result = IP_check.evaluate_ip(ip_addr)
+        return not result.get("is_safe", True)
+    except Exception as e:
+        print(f"  [!] IP integration error: {e}")
         return False
 
 def check_url_integration(url):
@@ -78,9 +82,11 @@ def check_url_integration(url):
                 url, model_data['model'], model_data['scaler'], 
                 model_data['threshold'], model_data['feature_columns']
             )
-            if label == "Phishing": return True
+            if label == "Phishing": 
+                return True
         return False
-    except Exception:
+    except Exception as e:
+        print(f"  [!] URL integration error: {e}")
         return False
 
 def extract_elements(text):
@@ -90,6 +96,7 @@ def extract_elements(text):
     ip_pattern = r'(?:[0-9]{1,3}\.){3}[0-9]{1,3}'
     ips = re.findall(ip_pattern, text)
     
+   
     url_pattern = r'(?i)(?:https?://|www\.)?[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:/[-a-zA-Z0-9()@:%_+.~#?&//=]*)?'
     raw_urls = re.findall(url_pattern, text)
     
@@ -119,7 +126,6 @@ def analyze_rule_based(sms_text):
         print("  [*] No extractable entities (URL, IP, Email, Phone) found.")
         return False, None
 
-    # Print out exactly what was extracted
     print("  [+] Extracted Entities:")
     for key, values in elements.items():
         if values:
@@ -127,7 +133,6 @@ def analyze_rule_based(sms_text):
 
     print("\n  [-] Analyzing extracted entities...")
     
-    # Check elements and immediately return if a malicious one is found
     for ip in elements['ips']:
         if check_ip_integration(ip): return True, f"IP: {ip}"
     for url in elements['urls']:

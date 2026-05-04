@@ -26,6 +26,16 @@ from IP_Address import IP_check
 from Phone import check_phone 
 from URL import check_url  
 
+sms_dir = os.path.join(current_dir, "SMS")
+if sms_dir not in sys.path:
+    sys.path.insert(0, sms_dir)
+
+from Email import check_email 
+from IP_Address import IP_check 
+from Phone import check_phone 
+from URL import check_url
+from SMS import check_sms  # <-- Added SMS import
+
 app = FastAPI(title="Multi-Vector Analysis Platform")
 
 # ... (Keep the rest of your main.py exactly the same below this) ...
@@ -69,6 +79,16 @@ async def analyze_phone(phone: str = Form(...)):
 @app.post("/api/analyze/url")
 async def analyze_url(url: str = Form(...)):
     return check_url.evaluate_url(url)
+
+@app.get("/sms", response_class=HTMLResponse)
+async def sms_page(request: Request):
+    return templates.TemplateResponse(request=request, name="sms.html")
+
+
+
+@app.post("/api/analyze/sms")
+async def analyze_sms(sms: str = Form(...)):
+    return check_sms.evaluate_sms(sms)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8080, reload=True)

@@ -4,6 +4,7 @@
         "./Phone",
         "./Email",
         "./IP Address",
-        "./URL"
+        "./URL",
+        "./IP_Address"
     ]
 }

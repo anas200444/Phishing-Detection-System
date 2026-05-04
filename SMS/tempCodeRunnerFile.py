@@ -43,7 +43,7 @@ if __name__ == "__main__":
             print("  Stage 2: Machine Learning Validation")
             print("-"*50)
             
-            
+            # Catching only the single text verdict now
             ml_verdict = predict_sms_ml(target_sms, trained_model, trained_vectorizer)
             print(f"  [*] ML Verdict: {ml_verdict.upper()}")
 

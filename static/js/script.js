@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const isIpPage = window.location.pathname.includes('/ip');
             const isPhonePage = window.location.pathname.includes('/phone');
             const isUrlPage = window.location.pathname.includes('/url');
+            const isSmsPage = window.location.pathname.includes('/sms');
             
             let endpoint = "/api/analyze/email";
             let formKey = "email";
@@ -46,6 +47,9 @@ document.addEventListener("DOMContentLoaded", () => {
             } else if (isUrlPage) {
                 endpoint = "/api/analyze/url";
                 formKey = "url";
+            } else if (isSmsPage) {
+                endpoint = "/api/analyze/sms";
+                formKey = "sms";
             }
 
             try {
