@@ -1,14 +1,14 @@
 import os
 import joblib
-from .url_utils import is_valid_url_format, ensure_url_scheme
-from .api_services import check_virustotal, submit_and_poll_urlscan, api_has_usable_result
-from .model_pipeline import predict_single_url
+import urllib.parse
+from url_utils import is_valid_url_format, ensure_url_scheme
+from api_services import check_virustotal, check_google_safe_browsing, get_url_intelligence, api_has_usable_result
+from model_pipeline import predict_single_url
 
 def evaluate_url(target_url: str) -> dict:
     """
-    Evaluates a URL using Threat Intel APIs first, falling back to ML.
+    Evaluates a URL using Threat Intel APIs and constructs HTML-safe result strings.
     """
-    # 1. Validation
     target_url = ensure_url_scheme(target_url)
     if not is_valid_url_format(target_url):
         return {
@@ -19,55 +19,46 @@ def evaluate_url(target_url: str) -> dict:
 
     details = []
     is_safe = True
+    screenshot_url = None  # Will hold the plain URL for the front-end
 
-    
+    # Primary API Checks
     vt_results = check_virustotal(target_url)
-    urlscan_data, scan_uuid = submit_and_poll_urlscan(target_url)
+    gsb_results = check_google_safe_browsing(target_url)
+    
+    # Microlink Screenshot URL (direct image URL via embed parameter)
+    encoded_url = urllib.parse.quote(target_url, safe='')
+    screenshot_url = f"https://api.microlink.io/?url={encoded_url}&screenshot=true&meta=false&embed=screenshot.url"
 
-    if api_has_usable_result(vt_results, urlscan_data):
+    if api_has_usable_result(vt_results, gsb_results):
         details.append("Analysis completed via Threat Intelligence APIs.")
         
+        # Google Safe Browsing Result
+        if "error" not in gsb_results:
+            if gsb_results.get("is_malicious"):
+                is_safe = False
+                details.append("Google Safe Browsing: Flagged as Malicious/Phishing.")
+            else:
+                details.append("Google Safe Browsing: Clean.")
         
+        # VirusTotal Result
         if "error" not in vt_results:
             stats = vt_results.get('stats', {})
             malicious_count = stats.get('malicious', 0)
             if malicious_count > 0 or vt_results.get('reputation', 0) < 0:
                 is_safe = False
-                details.append(f"VirusTotal : Flagged as Malicious (Detections: {malicious_count}).")
+                details.append(f"VirusTotal: Flagged as Malicious ({malicious_count} detections).")
             else:
-                details.append("VirusTotal : Clean (No malicious signatures found).")
+                details.append("VirusTotal: Clean (No malicious signatures found).")
 
-        
-        if urlscan_data:
-            overall = urlscan_data.get('verdicts', {}).get('overall', {})
-            if overall.get('malicious', False):
-                is_safe = False
-                details.append("urlscan.io: Categorized as Malicious.")
-            else:
-                details.append("urlscan.io : No direct threats found.")
-
-            # Extract useful server/network information
-            page_data = urlscan_data.get('page', {})
-            ip_addr = page_data.get('ip', 'N/A')
-            country = page_data.get('country', 'N/A')
-            server = page_data.get('server', 'N/A')
-            asn = page_data.get('asnname', 'Unknown')
-            
-            # Append the extracted info to the details list
-            details.append(f"Hosted IP Address: {ip_addr}")
-            details.append(f"Server Location (Country): {country}")
-            details.append(f"Server Name: {server}")
-            details.append(f"ISP / ASN: {asn}")
-
-            
-            if scan_uuid:
-                screenshot_url = f"https://urlscan.io/screenshots/{scan_uuid}.png"
-                
-                link_html = f"<a href='{screenshot_url}' target='_blank' style='color: var(--primary-color, #4facfe); text-decoration: underline;'>View Sandbox Screenshot</a>"
-                details.append(f"Live Capture: {link_html}")
+        # Metadata Enrichment
+        intel = get_url_intelligence(target_url)
+        details.append(f"Resolved IP: {intel.get('ip')}")
+        details.append(f"Hosting Location: {intel.get('country')}")
+        details.append(f"ISP / Provider: {intel.get('isp')}")
+        details.append(f"Domain Registered On: {intel.get('created')}")
 
     else:
-        # 3. ML Fallback (No APIs available)
+        # ML Fallback
         details.append("API results unavailable. Analyzing via local ML model.")
         try:
             current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -79,25 +70,17 @@ def evaluate_url(target_url: str) -> dict:
                 
                 if label.lower() == "phishing":
                     is_safe = False
-                    details.append("ML Model Verdict: Detected high-risk ")
+                    details.append("ML Model Verdict: Detected high-risk")
                 else:
                     details.append("ML Model Verdict: URL appears legitimate.")
             else:
-                return {
-                    "is_safe": False, 
-                    "status": "ANALYSIS FAILED", 
-                    "details": ["ML Model artifacts not found on the server."]
-                }
+                return {"is_safe": False, "status": "ANALYSIS FAILED", "details": ["Model artifacts missing."]}
         except Exception as e:
-            return {
-                "is_safe": False, 
-                "status": "ERROR", 
-                "details": [f"ML analysis failed: {str(e)}"]
-            }
+            return {"is_safe": False, "status": "ERROR", "details": [f"ML failed: {str(e)}"]}
 
-    # 4. Final Output Formatting
     return {
         "is_safe": is_safe,
         "status": "LEGITIMATE / SAFE" if is_safe else "PHISHING / MALICIOUS",
-        "details": details
+        "details": details,
+        "screenshot_url": screenshot_url if api_has_usable_result(vt_results, gsb_results) else None
     }

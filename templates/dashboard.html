@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Phishing Detection |{% endblock %}
+{% block content %}
+<section class="dashboard-screen">
+    <div class="dashboard-intro">
+        <div class="system-status"><span></span> ONLINE</div>
+        <h1>Phishing <em>Detection</em></h1>
+        <p> threat detection across all attack vectors.</p>
+    </div>
+
+    <div class="stats-grid" aria-label="Security statistics">
+        <article class="stat-card stat-cyan">
+            <div class="stat-meta"><span>Total Scans</span><i class="fas fa-bolt"></i></div>
+            <strong>0</strong>
+        </article>
+        <article class="stat-card stat-red">
+            <div class="stat-meta"><span>Threats Found</span><i class="fas fa-exclamation-triangle"></i></div>
+            <strong>0</strong>
+        </article>
+        <article class="stat-card stat-green">
+            <div class="stat-meta"><span>Safe Results</span><i class="fas fa-check-circle"></i></div>
+            <strong>0</strong>
+        </article>
+        <article class="stat-card stat-purple">
+            <div class="stat-meta"><span>Accuracy Rate</span><i class="fas fa-fingerprint"></i></div>
+            <strong>0%</strong>
+        </article>
+    </div>
+
+    <section class="modules-panel">
+        <h2><i class="fas fa-bolt"></i> Detection Modules</h2>
+        <div class="module-grid">
+            <a href="/url" class="module-tile tile-url">
+                <i class="fas fa-link"></i>
+                <h3>URL Scanner</h3>
+                <p>Analyze links for malicious domains and phishing attempts.</p>
+                <span>Open scanner <i class="fas fa-chevron-right"></i></span>
+            </a>
+            <a href="/ip" class="module-tile tile-ip">
+                <i class="fas fa-globe"></i>
+                <h3>IP Intelligence</h3>
+                <p>Trace IP addresses to check against global threat databases.</p>
+                <span>Open scanner <i class="fas fa-chevron-right"></i></span>
+            </a>
+            <a href="/phone" class="module-tile tile-phone">
+                <i class="fas fa-phone"></i>
+                <h3>Phone Verification</h3>
+                <p>Detect spoofed numbers and known scam caller IDs.</p>
+                <span>Open scanner <i class="fas fa-chevron-right"></i></span>
+            </a>
+            <a href="/sms" class="module-tile tile-sms">
+                <i class="far fa-comment-alt"></i>
+                <h3>SMS Analysis</h3>
+                <p>Scan text messages for social engineering tactics.</p>
+                <span>Open scanner <i class="fas fa-chevron-right"></i></span>
+            </a>
+            <a href="/email" class="module-tile tile-email">
+                <i class="far fa-envelope"></i>
+                <h3>Email Headers</h3>
+                <p>Analyze email senders to detect sender spoofing.</p>
+                <span>Open scanner <i class="fas fa-chevron-right"></i></span>
+            </a>
+            <a href="/qr" class="module-tile tile-qr">
+                <i class="fas fa-qrcode"></i>
+                <h3>QR Code Scanner</h3>
+                <p>Extract and analyze embedded URLs safely from images.</p>
+                <span>Open scanner <i class="fas fa-chevron-right"></i></span>
+            </a>
+        </div>
+    </section>
+</section>
+{% endblock %}

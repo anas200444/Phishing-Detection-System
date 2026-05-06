@@ -88,11 +88,11 @@ def resolve_final_url(url: str, max_redirects: int = 15):
 # --- Frontend Routes ---
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request, "email.html")
+    return templates.TemplateResponse(request, "dashboard.html")
 
 @app.get("/{page}", response_class=HTMLResponse)
 async def serve_page(request: Request, page: str):
-    valid_pages = ["email", "ip", "phone", "url", "sms", "qr"]
+    valid_pages = ["dashboard", "email", "ip", "phone", "url", "sms", "qr"]
     if page in valid_pages:
         return templates.TemplateResponse(request, f"{page}.html")
     return HTMLResponse("Page not found", status_code=404)

@@ -1,62 +1,69 @@
 import os
 import joblib
 import pandas as pd
-from url_utils import is_valid_url_format, ensure_url_scheme
-from model_pipeline import train_and_evaluate, prepare_data, predict_single_url
-from api_services import check_virustotal, submit_and_poll_urlscan, api_has_usable_result, display_report
+from urllib.parse import urlparse
+
+from url_utils import ensure_url_scheme, is_valid_url_format
+from model_pipeline import train_and_evaluate, prepare_data
+from check_url import evaluate_url
 from config import MODEL_ARTIFACTS_FILE, DATASET_FILE
 
-def analyze_url_api_first_then_ml(target_url: str, pipeline, threshold):
-    print(f"\n[+] Starting analysis for: {target_url}")
-    vt_results = check_virustotal(target_url)
-    urlscan_data, scan_uuid = submit_and_poll_urlscan(target_url)
 
-    if api_has_usable_result(vt_results, urlscan_data):
-        print("\n[+] API returned a result. Skipping ML model.")
-        display_report(urlscan_data, scan_uuid, vt_results, target_url)
-        return
+def display_result(result: dict) -> None:
+    """Pretty print the evaluation result from evaluate_url()."""
+    print("\n" + "=" * 60)
+    print(f"  FINAL VERDICT: {result['status']}")
+    print("=" * 60)
+    print("\n[ Details ]")
+    for line in result.get("details", []):
+        print(f"  • {line}")
 
-    print("\n[-] No usable API result found. Falling back to ML model...")
-    label, prob = predict_single_url(target_url, pipeline, threshold)
-    print(f"\n  ML Result -> [{label}]  confidence: {prob * 100:.2f}%")
+    if result.get("screenshot_url"):
+        print("\n[ Screenshot ]")
+        print(f"  {result['screenshot_url']}")
 
-def process_user_input(pipeline, threshold):
+
+def process_user_input(pipeline, threshold) -> None:
     print("\n" + "=" * 54)
-    print("  Simplified ML Phishing URL Detection System")
+    print("  Phishing URL Detection System (API + ML Fallback)")
     print("=" * 54)
-    
+
     while True:
-        url = input("\nEnter the URL to check (or type 'exit' to quit): ").strip()
-        
-        if url.lower() == 'exit':
+        raw_url = input("\nEnter the URL to check (or type 'exit' to quit): ").strip()
+        if raw_url.lower() == "exit":
             print("Exiting. Stay secure!")
             break
-
-        if not url:
+        if not raw_url:
             print("  [!] URL cannot be empty.")
             continue
-            
-        url = ensure_url_scheme(url)
+
+        url = ensure_url_scheme(raw_url)
         if not is_valid_url_format(url):
             print("  [!] Error: Please enter a valid URL.")
             print("  [i] Example: https://www.google.com or http://example.org")
             continue
-            
-        analyze_url_api_first_then_ml(url, pipeline, threshold)
+
+    
+        result = evaluate_url(url)
+        display_result(result)
+
+        pass
+
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(script_dir)
 
-    
+    # Check if we have a pre‑trained model
     if os.path.exists(MODEL_ARTIFACTS_FILE):
-        ans = input(f"[*] Found existing model '{MODEL_ARTIFACTS_FILE}'. Load it? (y/n): ").strip().lower()
-        if ans == 'y':
+        use_saved = input(f"[*] Found existing model '{MODEL_ARTIFACTS_FILE}'. Load it? (y/n): ").strip().lower()
+        if use_saved == 'y':
             print("[*] Loading saved model pipeline...")
             data = joblib.load(MODEL_ARTIFACTS_FILE)
             process_user_input(data['pipeline'], data['threshold'])
             return
 
+    # Otherwise train from dataset
     if not os.path.exists(DATASET_FILE):
         print(f"[!] Error: Training dataset '{DATASET_FILE}' not found.")
         return
@@ -70,10 +77,10 @@ def main():
         print(f"Error loading dataset: {exc}")
         return
 
-    
     X, y = prepare_data(df)
     pipeline, threshold = train_and_evaluate(X, y)
     process_user_input(pipeline, threshold)
+
 
 if __name__ == "__main__":
     main()

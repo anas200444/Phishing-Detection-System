@@ -1,9 +1,10 @@
 import base64
-import json
-import time
+import socket
 import requests
-from config import URLSCAN_HEADERS, VT_HEADERS
-from url_utils import extract_domain
+import whois
+from datetime import datetime
+from config import VT_HEADERS, GSB_API_KEY
+from url_utils import extract_domain   # changed from .url_utils
 
 def check_virustotal(target_url: str) -> dict:
     url_id = base64.urlsafe_b64encode(target_url.encode()).decode().strip("=")
@@ -17,115 +18,91 @@ def check_virustotal(target_url: str) -> dict:
                 "stats": attributes.get('last_analysis_stats', {}),
                 "reputation": attributes.get('reputation', 0)
             }
-        elif response.status_code == 404:
-            return { "No previous scan found on VirusTotal for this  URL."}
-        else:
-            return {"error": f"API Error {response.status_code}: Please verify your VT API key."}
-    except requests.exceptions.RequestException as e:
-        return {"error": f"Network error connecting to VirusTotal: {str(e)}"}
+        return {"error": "No previous scan found or API error."}
+    except Exception as e:
+        return {"error": str(e)}
 
-def submit_and_poll_urlscan(target_url: str):
-    urlscan_data, scan_uuid = None, None
-    print("Submitting URL to urlscan.io sandbox...")
-    payload = {"url": target_url, "visibility": "public"}
+def check_google_safe_browsing(target_url: str) -> dict:
+    if not GSB_API_KEY or GSB_API_KEY == 'AIzaSyDwjly0Y_EpTNYtxg9qNc_gTgvXT1HS3eU':
+         return {"is_malicious": False, "error": "GSB API Key not configured."}
 
+    endpoint = f"https://safebrowsing.googleapis.com/v4/threatMatches:find?key={GSB_API_KEY}"
+    payload = {
+        "client": {"clientId": "phish-detector", "clientVersion": "1.0.0"},
+        "threatInfo": {
+            "threatTypes": ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION"],
+            "platformTypes": ["ANY_PLATFORM"],
+            "threatEntryTypes": ["URL"],
+            "threatEntries": [{"url": target_url}]
+        }
+    }
     try:
-        response = requests.post('https://urlscan.io/api/v1/scan/', headers=URLSCAN_HEADERS, data=json.dumps(payload), timeout=15)
-        if response.status_code == 400:
-            print(" urlscan.io blocked the scan ")
-            return None, None
-        elif response.status_code != 200:
-            print(f"Error submitting to urlscan (Status {response.status_code}): {response.text}")
-            return None, None
+        response = requests.post(endpoint, json=payload, timeout=10)
+        result = response.json()
+        return {"is_malicious": "matches" in result, "details": result.get("matches", [])}
+    except Exception:
+        return {"is_malicious": False, "error": "GSB Lookup Failed"}
 
-        submission_data = response.json()
-        scan_uuid = submission_data.get('uuid')
-        api_endpoint = submission_data.get('api')
-        print("[*] Waiting for urlscan.io to process the site ")
+def get_url_intelligence(target_url: str) -> dict:
+    """Enhanced intelligence using socket, multiple geolocation APIs, and whois."""
+    domain = extract_domain(target_url)
+    intel = {
+        "domain": domain, 
+        "ip": "N/A", 
+        "country": "Unknown", 
+        "isp": "Unknown", 
+        "created": "N/A",
+        "org": "N/A"
+    }
 
-        max_polling_attempts, polling_interval_seconds = 12, 10
-        for attempt in range(max_polling_attempts):
-            time.sleep(polling_interval_seconds)
+    # 1. Local IP Resolution (Using Python Socket - No API)
+    try:
+        intel["ip"] = socket.gethostbyname(domain)
+    except:
+        pass
+
+    # 2. Geolocation – try multiple free APIs (no API key needed)
+    ip = intel["ip"]
+    if ip != "N/A":
+        # Primary: ipapi.co
+        country = "Unknown"
+        isp = "Unknown"
+        try:
+            geo = requests.get(f"https://ipapi.co/{ip}/json/", timeout=5).json()
+            if not geo.get("error"):
+                country = geo.get("country_name", "Unknown")
+                isp = geo.get("org", "Unknown")
+        except:
+            pass
+
+        # Fallback: ip-api.com if still unknown
+        if country == "Unknown" or isp == "Unknown":
             try:
-                result_response = requests.get(api_endpoint, headers=URLSCAN_HEADERS, timeout=15)
-                if result_response.status_code == 200:
-                    return result_response.json(), scan_uuid
-                elif result_response.status_code == 404:
-                    print(f"     ... still processing in sandbox (attempt {attempt + 1}/{max_polling_attempts})")
-                else:
-                    print(f"[-] Unexpected error during polling: Status {result_response.status_code}")
-                    return None, scan_uuid
-            except requests.exceptions.RequestException as e:
-                print(f"[-] Network error  {str(e)}")
-                return None, scan_uuid
-        print("[-] Timeout")
-        return None, scan_uuid
-    except requests.exceptions.RequestException as e:
-        print(f"[-] Network error occurred  {str(e)}")
-        return None, None
+                geo2 = requests.get(f"http://ip-api.com/json/{ip}", timeout=5).json()
+                if geo2.get("status") == "success":
+                    country = geo2.get("country", country)
+                    isp = geo2.get("isp", isp) or geo2.get("org", isp)
+            except:
+                pass
 
-def display_report(urlscan_data: dict, scan_uuid: str, vt_results: dict, target_url: str):
-    target_domain = extract_domain(target_url)
-    is_malicious = False
-    vt_malicious_count, vt_reputation, vt_suspicious_count = 0, 0, 0
-    stats = {}
+        intel["country"] = country or "Unknown"
+        intel["isp"] = isp or "Unknown"
 
-    if "error" not in vt_results:
-        stats = vt_results.get('stats', {})
-        vt_malicious_count = stats.get('malicious', 0)
-        vt_suspicious_count = stats.get('suspicious', 0)
-        vt_reputation = vt_results.get('reputation', 0)
-        if vt_malicious_count > 0 or vt_reputation < 0:
-            is_malicious = True
+    # 3. Domain Registration via python-whois (No API Key required)
+    try:
+        w = whois.whois(domain)
+        creation_date = w.creation_date
+        if isinstance(creation_date, list):
+            creation_date = creation_date[0]
+        if creation_date:
+            intel["created"] = creation_date.strftime("%Y-%m-%d")
+        intel["org"] = w.org or "Private"
+    except:
+        pass
 
-    gsb_status = f"No classification for {target_domain}"
-    overall_verdicts, engines_verdicts = {}, {}
+    return intel
 
-    if urlscan_data:
-        overall_verdicts = urlscan_data.get('verdicts', {}).get('overall', {})
-        engines_verdicts = urlscan_data.get('verdicts', {}).get('engines', {})
-        if overall_verdicts.get('malicious', False): is_malicious = True
-        engines_malicious = engines_verdicts.get('malicious', [])
-        if isinstance(engines_malicious, list) and 'googlesafebrowsing' in [str(engine).lower() for engine in engines_malicious]:
-            gsb_status = f"Flagged as malicious for {target_domain}"
-            is_malicious = True
-
-    print(">>> OVERALL VERDICT: MALICIOUS <<<".center(70) if is_malicious else ">>> OVERALL VERDICT: SAFE <<<".center(70))
-    print("\n[ TARGET INFORMATION ]\n")
-    print(f"Target URL         : {target_url}\nTarget Domain      : {target_domain}")
-
-    if urlscan_data:
-        page_data = urlscan_data.get('page', {})
-        print(f"Primary IP         : {page_data.get('ip', 'N/A')}\nHosted Country     : {page_data.get('country', 'N/A')}")
-        print(f"Server Name        : {page_data.get('server', 'N/A')}\nISP / ASN          : {page_data.get('asnname', 'Unknown')} ({page_data.get('asn', 'Unknown')})\nTLS/SSL Valid      : {page_data.get('tlsValid', 'Unknown')}")
-    else:
-        print(" (urlscan.io scan was blocked or failed)")
-
-    print("\n[ VIRUSTOTAL  ]\n" )
-    if "error" in vt_results:
-        print(f"Status             : {vt_results['error']}")
-    else:
-        harmless, undetected = stats.get('harmless', 0), stats.get('undetected', 0)
-        total_engines = vt_malicious_count + vt_suspicious_count + harmless + undetected
-        print(f"VT Verdict         : {'[ MALICIOUS ]' if (vt_malicious_count > 0 or vt_reputation < 0) else '[ CLEAN / SUSPICIOUS ONLY ]'}")
-        print(f"Community Score    : {vt_reputation}\nDetection Ratio    : {vt_malicious_count} out of {total_engines} security vendors flagged the URL as Malicious")
-        print(f"Breakdown          : Malicious: {vt_malicious_count} | Suspicious: {vt_suspicious_count} | Clean/Unrated: {harmless + undetected}")
-
-    print("\n[ URLSCAN.IO THREAT I ]\n" + "-" * 70)
-    if urlscan_data:
-        print(f"urlscan.io Verdict : {'[ MALICIOUS ]' if overall_verdicts.get('malicious', False) else '[ CLEAN / UNKNOWN ]'}")
-        print(f"Threat Score       : {overall_verdicts.get('score', 0)}\nCategories         : {', '.join(overall_verdicts.get('categories', [])) or 'None detected'}")
-        print(f"Threat Tags        : {', '.join(overall_verdicts.get('tags', [])) or 'None detected'}\nGoogle Safe Browsing: {gsb_status}")
-        network_lists = urlscan_data.get('lists', {})
-        print("\n[ NETWORK ACTIVITY  ]\n" + "-" * 70)
-        print(f"IPs Contacted      : {len(network_lists.get('ips', []))}\nDomains Reached    : {len(network_lists.get('domains', []))}\nURLs Loaded        : {len(network_lists.get('urls', []))}")
-    else:
-        print(f"urlscan.io Data    : Ignored / Scan Prevented\nGoogle Safe Browsing: {gsb_status} (No urlscan data)")
-
-    if scan_uuid: print("\n[ ARTIFACTS ]\n" + "-" * 70 + f"\nScreenshot Link    : https://urlscan.io/screenshots/{scan_uuid}.png")
-    print("=" * 70 + "\n")
-
-def api_has_usable_result(vt_results: dict, urlscan_data: dict) -> bool:
-    vt_ok = isinstance(vt_results, dict) and "error" not in vt_results and (bool(vt_results.get("stats")) or vt_results.get("reputation", None) is not None)
-    urlscan_ok = isinstance(urlscan_data, dict) and len(urlscan_data) > 0
-    return vt_ok or urlscan_ok
+def api_has_usable_result(vt_results: dict, gsb_results: dict) -> bool:
+    vt_ok = isinstance(vt_results, dict) and "error" not in vt_results
+    gsb_ok = isinstance(gsb_results, dict) and "error" not in gsb_results
+    return vt_ok or gsb_ok

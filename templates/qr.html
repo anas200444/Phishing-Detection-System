@@ -1,64 +1,60 @@
 {% extends "base.html" %}
+{% block title %}QR Decoder | Phishing Detection{% endblock %}
 {% block content %}
 <script src="https://unpkg.com/html5-qrcode"></script>
 
-
-<div class="analysis-card">
-    <div class="header-text">
-        <h1>Phishing Detection</h1>
-        <p>Detect sophisticated phishing attempts across URLs, IPs, Phone Numbers, SMS, Email, and QR Codes.</p>
-    </div>
-    <div class="tabs">
-        <a href="/url" class="tab"><i class="fas fa-link"></i> URL</a>
-        <a href="/ip" class="tab"><i class="fas fa-globe"></i> IP</a>
-        <a href="/phone" class="tab"><i class="fas fa-phone"></i> Phone</a>
-        <a href="/sms" class="tab"><i class="fas fa-mobile-alt"></i> SMS</a>
-        <a href="/email" class="tab"><i class="far fa-envelope"></i> Email</a>
-        <a href="/qr" class="tab active"><i class="fas fa-qrcode"></i> QR</a>
-    </div>
-    
-    
-    <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 1.5rem; flex-wrap: wrap;">
-        <button id="start-camera-btn" class="btn-primary"><i class="fas fa-camera"></i> Use Camera</button>
-        <button id="stop-camera-btn" class="btn-primary" style="display:none; background-color: var(--danger-text);"><i class="fas fa-stop"></i> Stop Camera</button>
-        
-        <label for="qr-upload" class="btn-primary" style="cursor: pointer; background-color: var(--text-muted); display: inline-block;">
-            <i class="fas fa-upload"></i> Upload Image
-        </label>
-        <input type="file" id="qr-upload" accept="image/*" style="display: none;">
+<section class="module-screen module-qr">
+    <div class="qr-header">
+        <div class="module-icon icon-qr qr-hero-icon"><i class="fas fa-qrcode"></i></div>
+        <h1>QR Decoder</h1>
+        <p>Malicious actors often embed phishing URLs inside QR codes. Use your camera or upload an image to safely extract and analyze the contents.</p>
     </div>
 
-   
-    <div style="display: flex; justify-content: center; margin-bottom: 2rem;">
-        <div id="reader" style="width: 100%; max-width: 500px; border-radius: 8px; overflow: hidden;"></div>
-    </div>
+    <div class="analysis-card qr-card">
+        <div class="qr-actions">
+            <button id="start-camera-btn" class="btn-primary btn-qr" type="button"><i class="fas fa-camera"></i> Use Camera</button>
+            <button id="stop-camera-btn" class="btn-primary btn-danger" type="button" style="display:none;"><i class="fas fa-stop"></i> Stop Camera</button>
+            <label for="qr-upload" class="btn-secondary upload-label"><i class="fas fa-upload"></i> Upload Image</label>
+            <input type="file" id="qr-upload" accept="image/*" hidden>
+        </div>
 
-   
-    <div class="input-group" style="display: none;">
-        <i class="fas fa-search search-icon"></i>
-        <input type="text" id="target-input" placeholder="Scanned data will appear here..." readonly>
-        <button id="analyze-btn" class="btn-primary">Analyze</button>
-    </div>
+        <div class="qr-divider"><span>or</span></div>
 
-    <div id="results-container" class="results-box hidden">
-        <div class="results-header">
-            <div class="status-group">
-                <div id="status-icon-box" class="icon-circle safe-icon">
-                    <i id="status-icon" class="fas fa-check"></i>
-                </div>
-                <div class="status-text">
-                    <span class="label">Analysis Status</span>
-                    <div class="badge-row">
-                        <span id="status-badge" class="badge badge-safe"></span>
+        <div id="reader" class="qr-reader"></div>
+
+        <div id="qr-drop-zone" class="qr-drop-zone" role="button" tabindex="0" aria-label="Upload QR image">
+            <i class="fas fa-qrcode"></i>
+            <strong>Drag and drop QR image here</strong>
+            <span>Supports PNG, JPG, or JPEG (Max 5MB)</span>
+        </div>
+
+        <div class="input-group qr-hidden-input">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="target-input" placeholder="Scanned data will appear here..." readonly>
+            <button id="analyze-btn" class="btn-primary btn-qr">Analyze</button>
+        </div>
+
+        <div id="results-container" class="results-box hidden">
+            <div class="results-header">
+                <div class="status-group">
+                    <div id="status-icon-box" class="icon-circle safe-icon">
+                        <i id="status-icon" class="fas fa-check"></i>
+                    </div>
+                    <div class="status-text">
+                        <span class="label">Analysis Status</span>
+                        <div class="badge-row">
+                            <span id="status-badge" class="badge badge-safe"></span>
+                            <span id="confidence-text" class="confidence"></span>
+                        </div>
                     </div>
                 </div>
+                <button id="clear-btn" class="btn-text">Clear Results</button>
             </div>
-            <button id="clear-btn" class="btn-text">Clear Results</button>
-        </div>
-        <div class="details-section">
-            <h4>DETAILS</h4>
-            <ul id="details-list"></ul>
+            <div class="details-section">
+                <h4>DETAILS</h4>
+                <ul id="details-list"></ul>
+            </div>
         </div>
     </div>
-</div>
+</section>
 {% endblock %}

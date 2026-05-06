@@ -1,44 +1,31 @@
 import os
 
-# API
-URLSCAN_API_KEY = '019d1a04-6286-73c5-8053-b19f5f9e0985'
+# --- API KEYS ---
 VT_API_KEY = 'fb9ed8979176bc743716b6736bba75ddce368e7fd06f129517ff8b10e452bd9c'
+GSB_API_KEY = 'AIzaSyDwjly0Y_EpTNYtxg9qNc_gTgvXT1HS3eU'
 
-URLSCAN_HEADERS = {'API-Key': URLSCAN_API_KEY, 'Content-Type': 'application/json'}
 VT_HEADERS = {"accept": "application/json", "x-apikey": VT_API_KEY}
 
-# ML 
+# --- ML Configuration ---
 DATASET_FILE = "URL dataset.csv"
 VISUALS_DIR  = "visualizations"
-
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_ARTIFACTS_FILE = os.path.join(PROJECT_DIR, "Phishing_URL_pipeline.pkl")
 
-#TYPOSQUATTING LIST
+# --- TYPOSQUATTING LIST ---
 TYPOSQUAT_LIST = [
-    
     'google', 'microsoft', 'apple', 'amazon', 'github', 'dropbox', 
     'slack', 'adobe', 'yahoo', 'outlook', 'docusign', 'oracle',
-    
-    
     'facebook', 'linkedin', 'instagram', 'twitter', 'tiktok', 
     'whatsapp', 'snapchat', 'discord', 'telegram', 'zoom',
-    
-    
     'paypal', 'chase', 'bankofamerica', 'wellsfargo', 'capitalone', 
     'citibank', 'barclays', 'hsbc', 'visa', 'mastercard', 'americanexpress',
-    
-    
     'binance', 'coinbase', 'kraken', 'metamask', 'trustwallet',
-    
-   
     'netflix', 'ebay', 'steam', 'roblox', 'spotify', 'walmart', 'target',
-    
-    
     'fedex', 'dhl', 'ups', 'usps'
 ]
 
-# HOMOGLYPH CHARACTER MAPPING
+# --- HOMOGLYPH CHARACTER MAPPING ---
 HOMOGLYPH_CHAR_MAP = {
     'а': 'a', 'ɑ': 'a', 'α': 'a', 'ａ': 'a', '@': 'a', '4': 'a', 'ä': 'a', 'á': 'a', 'à': 'a', 'â': 'a', 'ã': 'a', 'å': 'a', 'ą': 'a',
     'е': 'e', 'ε': 'e', 'ｅ': 'e', '3': 'e', 'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'ę': 'e', 'ė': 'e',
