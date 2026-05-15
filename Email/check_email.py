@@ -2,9 +2,21 @@ import os
 import sys
 import dns.resolver
 import requests
+import json
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-BLOCKLIST_FILE = os.path.join(script_dir, "disposable_email_blocklist.txt")
+# Add root directory to path to import central Ollama module
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
+
+try:
+    from ollama_analyzer import get_ai_analysis
+except ImportError:
+    print("Warning: ollama_analyzer.py not found in root. AI insights disabled.")
+    def get_ai_analysis(*args, **kwargs): return {"impact_analysis": [], "countermeasures": []}
+
+BLOCKLIST_FILE = os.path.join(current_dir, "disposable_email_blocklist.txt")
 
 def get_domain_from_email(email):
     try:
@@ -13,7 +25,6 @@ def get_domain_from_email(email):
         return None
 
 def check_blocklist(domain):
-    """Analysis against disposable blocklist."""
     if not os.path.exists(BLOCKLIST_FILE):
         return False
 
@@ -79,12 +90,43 @@ def check_stopforumspam(email):
         else:
             result["error"] = f"API HTTP Error: {response.status_code}"
             
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RequestException:
         result["error"] = "Network connection failed."
     except ValueError:
         result["error"] = "Failed to response."
         
     return result
+
+def calculate_threat_metrics(is_disposable, spf, dmarc, sfs_data):
+    score = 0
+    impact = 1 
+    
+    if is_disposable:
+        score += 75
+        impact = 3
+        
+    if not spf:
+        score += 15
+        impact = max(impact, 2)
+        
+    if not dmarc:
+        score += 15
+        impact = max(impact, 2)
+        
+    if sfs_data.get("is_flagged"):
+        score += sfs_data.get("confidence", 50)
+        impact = 3
+        
+    score = min(max(int(score), 1), 100) 
+    
+    if score < 30:
+        likelihood = 1 
+    elif score < 70:
+        likelihood = 2 
+    else:
+        likelihood = 3 
+        
+    return score, likelihood, impact
 
 def evaluate_email(email):
     domain = get_domain_from_email(email)
@@ -100,46 +142,48 @@ def evaluate_email(email):
     spf, dmarc = check_dns_records(domain)
     sfs_data = check_stopforumspam(email)
 
-    details = [
-        f"Target Email: {email}",
-        f"Extracted Domain: {domain}"
-    ]
-    
+    details = [f"Target Email: {email}", f"Extracted Domain: {domain}"]
     is_safe = True
 
     if is_disposable:
         is_safe = False
         details.append("Domain matches a known temporary email provider.")
     
-    # 2. DNS Authentication Check
     if spf and dmarc:
-        details.append("DNS Authentication: (Both SPF and DMARC records found).")
+        details.append("DNS Authentication: Both SPF and DMARC records found.")
     elif spf:
-        details.append("DNS Authentication: (SPF found, DMARC missing).")
+        details.append("DNS Authentication: SPF found, DMARC missing.")
     elif dmarc:
-        details.append("DNS Authentication: (DMARC found, SPF missing).")
+        details.append("DNS Authentication: DMARC found, SPF missing.")
     else:
         is_safe = False
         details.append("DNS Authentication Failure: Domain lacks proper SPF or DMARC records.")
-
     
     if sfs_data.get("is_flagged"):
         is_safe = False
         details.append(f"Flagged maliciously by Threat Database.")
         details.append(f"Database Appearances: {sfs_data.get('frequency')}")
         details.append(f"Threat Confidence: {sfs_data.get('confidence')}%")
+    elif sfs_data.get("error"):
+        details.append(f"Could not verify threat DB ({sfs_data.get('error')}).")
     else:
-        if sfs_data.get("error"):
-            details.append(f"Could not verify ({sfs_data.get('error')}).")
-        else:
-            details.append("Clear (No known threats).")
+        details.append("Clear (No known threats in DB).")
 
-    # Final Status Verdict
     status = "LEGITIMATE / SAFE" if is_safe else "PHISHING / MALICIOUS"
+
+    threat_score, likelihood, impact = calculate_threat_metrics(is_disposable, spf, dmarc, sfs_data)
+    
+    # Call Centralized Ollama Script
+    ai_data = get_ai_analysis(email, "Email", threat_score, details)
 
     return {
         "status": status,
         "is_safe": is_safe,
+        "threat_score": threat_score,
+        "likelihood": likelihood,
+        "impact": impact,
+        "ai_impact": ai_data.get("impact_analysis", []),
+        "ai_countermeasures": ai_data.get("countermeasures", []),
         "details": details
     }
 
@@ -149,6 +193,8 @@ if __name__ == "__main__":
         if user_input:
             result = evaluate_email(user_input)
             print(f"\n*** VERDICT: {result['status']} ***")
+            print(f"Threat Score: {result['threat_score']}/100")
+            print("\nDetails:")
             for detail in result['details']:
                 print(f"- {detail}")
             print("-" * 40)

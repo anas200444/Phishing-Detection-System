@@ -48,3 +48,4 @@ def evaluate_sms(text: str) -> dict:
         "status": status,
         "details": details
     }
+#resourses : https://github.com/shaghayegh-hp/Smishing_Dataset#combined-labeled-smishing-dataset

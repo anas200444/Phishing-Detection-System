@@ -57,7 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (customColor) icon.style.color = customColor;
 
         const span = document.createElement("span");
-        // Use innerHTML so any HTML content (like the screenshot link) renders correctly
+        
         span.innerHTML = text;
 
         li.appendChild(icon);
@@ -88,6 +88,93 @@ document.addEventListener("DOMContentLoaded", () => {
             confidenceText.textContent = data.confidence !== undefined ? `Confidence: ${data.confidence}` : "";
         }
 
+        
+        const threatTop = document.getElementById("threat-top-dashboard");
+        const threatBottom = document.getElementById("threat-bottom-dashboard");
+        
+        if (threatTop && data.threat_score !== undefined) {
+            threatTop.classList.remove("hidden");
+            
+            
+            const scoreNum = document.getElementById("score-number");
+            const scoreFill = document.getElementById("threat-score-fill");
+            const score = data.threat_score;
+            
+            scoreNum.textContent = score;
+            scoreFill.style.width = `${score}%`;
+            
+            if (score < 30) {
+                scoreNum.style.color = "var(--safe-text)";
+                scoreFill.style.backgroundColor = "var(--safe-text)";
+                scoreFill.style.boxShadow = "0 0 10px var(--safe-text)";
+            } else if (score < 70) {
+                scoreNum.style.color = "var(--orange)";
+                scoreFill.style.backgroundColor = "var(--orange)";
+                scoreFill.style.boxShadow = "0 0 10px var(--orange)";
+            } else {
+                scoreNum.style.color = "var(--danger-text)";
+                scoreFill.style.backgroundColor = "var(--danger-text)";
+                scoreFill.style.boxShadow = "0 0 10px var(--danger-text)";
+            }
+
+            
+            document.querySelectorAll(".matrix-cell").forEach(cell => {
+                cell.className = "matrix-cell"; 
+            });
+            
+            const targetLikelihood = data.likelihood || 1;
+            const targetImpact = data.impact || 1;
+            const activeCell = document.getElementById(`cell-${targetLikelihood}-${targetImpact}`);
+            
+            if (activeCell) {
+                let riskClass = "active-low";
+                if (score >= 70) riskClass = "active-high";
+                else if (score >= 30) riskClass = "active-med";
+                activeCell.classList.add("active", riskClass);
+            }
+
+            
+            const impactList = document.getElementById("ai-impact-list");
+            const counterList = document.getElementById("ai-countermeasures-list");
+            
+            impactList.innerHTML = "";
+            counterList.innerHTML = "";
+
+            
+            const hasAiData = (data.ai_impact && data.ai_impact.length > 0) || 
+                              (data.ai_countermeasures && data.ai_countermeasures.length > 0);
+
+            if (hasAiData && threatBottom) {
+                threatBottom.classList.remove("hidden");
+
+                if (data.ai_impact && data.ai_impact.length > 0) {
+                    data.ai_impact.forEach(impact => {
+                        const li = document.createElement("li");
+                        li.className = score >= 70 ? "high-impact" : "";
+                        li.innerHTML = `<i class="fas fa-circle"></i><span>${impact}</span>`;
+                        impactList.appendChild(li);
+                    });
+                }
+
+                if (data.ai_countermeasures && data.ai_countermeasures.length > 0) {
+                    data.ai_countermeasures.forEach(cm => {
+                        const li = document.createElement("li");
+                        li.innerHTML = `<i class="far fa-check-circle"></i><span>${cm}</span>`;
+                        counterList.appendChild(li);
+                    });
+                }
+            } else if (threatBottom) {
+             
+                threatBottom.classList.add("hidden");
+            }
+            
+        } else {
+           
+            if (threatTop) threatTop.classList.add("hidden");
+            if (threatBottom) threatBottom.classList.add("hidden");
+        }
+
+        
         detailsList.innerHTML = "";
 
         if (window.location.pathname.includes("/qr") && inputVal) {
@@ -101,7 +188,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        // If a screenshot URL is provided, create a clickable link here
         if (data.screenshot_url) {
             const linkHtml = `Live Preview: <a href="${data.screenshot_url}" target="_blank" onclick="event.stopPropagation();" style="color: #4facfe; text-decoration: underline; font-weight: bold; cursor: pointer;">View Live Screenshot</a>`;
             appendDetailItem("fas fa-camera", linkHtml, false, "var(--primary-color)");
@@ -109,7 +195,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         resultsContainer.classList.remove("hidden");
     }
-
     async function performAnalysis(inputVal, endpoint, formKey) {
         try {
             const formData = new FormData();
