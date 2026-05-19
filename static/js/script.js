@@ -57,7 +57,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (customColor) icon.style.color = customColor;
 
         const span = document.createElement("span");
-        
         span.innerHTML = text;
 
         li.appendChild(icon);
@@ -85,16 +84,14 @@ document.addEventListener("DOMContentLoaded", () => {
         statusBadge.textContent = data.status || (isSafe ? "Safe" : "Threat Detected");
 
         if (confidenceText) {
-            confidenceText.textContent = data.confidence !== undefined ? `Confidence: ${data.confidence}` : "";
+            confidenceText.textContent = data.confidence !== undefined ? `Evidence Confidence: ${data.confidence}` : "";
         }
 
-        
         const threatTop = document.getElementById("threat-top-dashboard");
         const threatBottom = document.getElementById("threat-bottom-dashboard");
         
         if (threatTop && data.threat_score !== undefined) {
             threatTop.classList.remove("hidden");
-            
             
             const scoreNum = document.getElementById("score-number");
             const scoreFill = document.getElementById("threat-score-fill");
@@ -117,37 +114,45 @@ document.addEventListener("DOMContentLoaded", () => {
                 scoreFill.style.boxShadow = "0 0 10px var(--danger-text)";
             }
 
-            
+            // Fix: Use classList.remove instead of overwriting className to preserve base UI structure
             document.querySelectorAll(".matrix-cell").forEach(cell => {
-                cell.className = "matrix-cell"; 
+                cell.classList.remove("active", "active-note", "active-low", "active-med", "active-high", "active-critical");
             });
             
-            const targetLikelihood = data.likelihood || 1;
-            const targetImpact = data.impact || 1;
-            const activeCell = document.getElementById(`cell-${targetLikelihood}-${targetImpact}`);
+            const targetConfidence = data.threat_confidence || data.likelihood || 1;
+            const targetHarm = data.potential_harm || data.impact || 1;
+            const activeCell = document.getElementById(`cell-${targetConfidence}-${targetHarm}`);
             
             if (activeCell) {
                 let riskClass = "active-low";
-                if (score >= 70) riskClass = "active-high";
-                else if (score >= 30) riskClass = "active-med";
+                
+                // Map the backend OWASP severity strictly to the UI layer
+                if (data.risk_label === "Critical") {
+                    riskClass = "active-critical";
+                } else if (data.risk_label === "High") {
+                    riskClass = "active-high";
+                } else if (data.risk_label === "Medium") {
+                    riskClass = "active-med";
+                } else if (data.risk_label === "Note") {
+                    riskClass = "active-note";
+                }
+                
                 activeCell.classList.add("active", riskClass);
             }
 
-            
             const impactList = document.getElementById("ai-impact-list");
             const counterList = document.getElementById("ai-countermeasures-list");
             
-            impactList.innerHTML = "";
-            counterList.innerHTML = "";
+            if (impactList) impactList.innerHTML = "";
+            if (counterList) counterList.innerHTML = "";
 
-            
             const hasAiData = (data.ai_impact && data.ai_impact.length > 0) || 
                               (data.ai_countermeasures && data.ai_countermeasures.length > 0);
 
             if (hasAiData && threatBottom) {
                 threatBottom.classList.remove("hidden");
 
-                if (data.ai_impact && data.ai_impact.length > 0) {
+                if (data.ai_impact && data.ai_impact.length > 0 && impactList) {
                     data.ai_impact.forEach(impact => {
                         const li = document.createElement("li");
                         li.className = score >= 70 ? "high-impact" : "";
@@ -156,7 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 }
 
-                if (data.ai_countermeasures && data.ai_countermeasures.length > 0) {
+                if (data.ai_countermeasures && data.ai_countermeasures.length > 0 && counterList) {
                     data.ai_countermeasures.forEach(cm => {
                         const li = document.createElement("li");
                         li.innerHTML = `<i class="far fa-check-circle"></i><span>${cm}</span>`;
@@ -164,17 +169,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 }
             } else if (threatBottom) {
-             
                 threatBottom.classList.add("hidden");
             }
             
         } else {
-           
             if (threatTop) threatTop.classList.add("hidden");
             if (threatBottom) threatBottom.classList.add("hidden");
         }
 
-        
         detailsList.innerHTML = "";
 
         if (window.location.pathname.includes("/qr") && inputVal) {
@@ -195,6 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         resultsContainer.classList.remove("hidden");
     }
+    
     async function performAnalysis(inputVal, endpoint, formKey) {
         try {
             const formData = new FormData();

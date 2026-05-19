@@ -7,7 +7,7 @@
             <div class="module-icon icon-ip"><i class="fas fa-globe"></i></div>
             <div>
                 <h1>IP Intelligence</h1>
-                <p>Trace IP addresses to check against global threat databases and honeypots.</p>
+                <p>Trace IP addresses to check against global threat databases</p>
             </div>
         </div>
 
@@ -51,20 +51,38 @@
                             <i class="fas fa-exclamation-circle"></i> RISK ASSESSMENT MATRIX
                         </div>
                         <div class="matrix-wrapper">
-                            <span class="axis-label y-axis">IMPACT</span>
-                            <div class="risk-matrix">
-                                <div class="matrix-cell" id="cell-1-3"></div>
-                                <div class="matrix-cell" id="cell-2-3"></div>
-                                <div class="matrix-cell" id="cell-3-3"></div>
-                                <div class="matrix-cell" id="cell-1-2"></div>
-                                <div class="matrix-cell" id="cell-2-2"></div>
-                                <div class="matrix-cell" id="cell-3-2"></div>
-                                <div class="matrix-cell" id="cell-1-1"></div>
-                                <div class="matrix-cell" id="cell-2-1"></div>
-                                <div class="matrix-cell" id="cell-3-1"></div>
+                            <div class="y-axis-container">
+                                <span class="axis-label y-axis">THREAT CONFIDENCE</span>
+                                <div class="y-axis-ticks">
+                                    <span>High</span>
+                                    <span>Med</span>
+                                    <span>Low</span>
+                                </div>
+                            </div>
+                            <div class="matrix-content">
+                                <div class="x-axis-top">
+                                    <span class="axis-label x-axis" style="margin-top:0;">POTENTIAL HARM</span>
+                                    <div class="top-ticks">
+                                        <span>Low</span>
+                                        <span>Medium</span>
+                                        <span>High</span>
+                                    </div>
+                                </div>
+                                <div class="risk-matrix">
+                                    <div class="matrix-cell risk-medium" id="cell-3-1">Medium</div>
+                                    <div class="matrix-cell risk-high" id="cell-3-2">High</div>
+                                    <div class="matrix-cell risk-critical" id="cell-3-3">Critical</div>
+                                    
+                                    <div class="matrix-cell risk-low" id="cell-2-1">Low</div>
+                                    <div class="matrix-cell risk-medium" id="cell-2-2">Medium</div>
+                                    <div class="matrix-cell risk-high" id="cell-2-3">High</div>
+                                    
+                                    <div class="matrix-cell risk-note" id="cell-1-1">Note</div>
+                                    <div class="matrix-cell risk-low" id="cell-1-2">Low</div>
+                                    <div class="matrix-cell risk-medium" id="cell-1-3">Medium</div>
+                                </div>
                             </div>
                         </div>
-                        <div class="axis-label x-axis">LIKELIHOOD</div>
                     </div>
                 </div>
             </div>
@@ -78,7 +96,7 @@
                 <div class="dashboard-row ai-cards-row">
                     <div class="ai-card impact-card">
                         <div class="ai-card-header">
-                            <i class="fas fa-info-circle"></i> Impact Analysis
+                            <i class="fas fa-info-circle"></i> Potential Harm Analysis
                         </div>
                         <ul id="ai-impact-list" class="ai-list"></ul>
                     </div>
