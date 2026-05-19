@@ -23,7 +23,6 @@ except ImportError:
 # --- Constants & Config ---
 TWILIO_ACCOUNT_SID = 'ACf6798286da9976d744abfe90e6c43883'
 TWILIO_AUTH_TOKEN = 'e3f3b8526b36580e16b614ca2371adfe'
-DISPOSABLE_DB_URL = "https://raw.githubusercontent.com/iP1SMS/disposable-phone-numbers/refs/heads/master/number-list.json"
 
 def get_dynamic_country_iso():
     headers = {
@@ -77,58 +76,65 @@ def parse_number(raw_number, dynamic_region):
             
     return None
 
-def check_disposable_status(phone_number):
-    try:
-        response = requests.get(DISPOSABLE_DB_URL, timeout=5)
-        if response.status_code == 200:
-            disposable_dict = response.json()
-            digits_only = phone_number.lstrip('+')
-            if digits_only in disposable_dict or phone_number in disposable_dict:
-                return True
-    except Exception:
-        pass
-    return False
-
-def check_secondary_spam_database(phone_number):
-    try:
-        risk_url = f"https://raw.githubusercontent.com/mrcasals/spam-numbers/master/spam_numbers.txt"
-        res = requests.get(risk_url, timeout=5)
-        if res.status_code == 200:
-            if phone_number in res.text or phone_number.lstrip('+') in res.text:
-                return True
-    except Exception:
-        pass
-    return False
-
-def calculate_threat_metrics(is_disposable, is_skip_spam, is_osint_spam, is_voip, twilio_score):
-    score = 0
-    impact = 1 
+def calculate_threat_metrics(is_skip_spam, is_voip, twilio_risk):
+    # 1. Threat Confidence score, 0-9.
+    threat_confidence_score = 0.0
+    threat_confidence_score += (twilio_risk / 100.0) * 5.0
     
-    if is_disposable:
-        score += 65
-        impact = 3
     if is_skip_spam:
-        score += 75
-        impact = 3
-    if is_osint_spam:
-        score += 55
-        impact = max(impact, 2)
+        threat_confidence_score += 3.0
     if is_voip:
-        score += 30
-        impact = max(impact, 2)
+        threat_confidence_score += 1.5
         
-    score += twilio_score 
-    
-    score = min(max(int(score), 1), 100) 
-    
-    if score < 30:
-        likelihood = 1 
-    elif score < 70:
-        likelihood = 2 
+    threat_confidence_score = min(9.0, threat_confidence_score)
+
+    # 2. Potential Harm score, 0-9.
+    if twilio_risk >= 70 or is_skip_spam:
+        potential_harm_score = 7.5
+    elif twilio_risk >= 40 or is_voip:
+        potential_harm_score = 6.0
+    elif twilio_risk > 10:
+        potential_harm_score = 4.0
     else:
-        likelihood = 3 
-        
-    return score, likelihood, impact
+        potential_harm_score = 2.0
+
+    # OWASP threshold style: 0-<3 Low, 3-<6 Medium, 6-9 High.
+    def scale_level(score):
+        if score < 3: return 1
+        if score < 6: return 2
+        return 3
+
+    threat_confidence_level = scale_level(threat_confidence_score)
+    potential_harm_level = scale_level(potential_harm_score)
+
+    # Risk matrix: (Threat Confidence, Potential Harm)
+    # 1 = Low, 2 = Medium, 3 = High
+    risk_matrix = {
+        (3, 3): "Critical",
+        (3, 2): "High",
+        (3, 1): "Medium",
+        (2, 3): "High",
+        (2, 2): "Medium",
+        (2, 1): "Low",
+        (1, 3): "Medium",
+        (1, 2): "Low",
+        (1, 1): "Note"
+    }
+
+    risk_label = risk_matrix.get((threat_confidence_level, potential_harm_level), "Note")
+
+    # 0-100 UI score derived from the two matrix inputs.
+    threat_score = min(100, int(((threat_confidence_score + potential_harm_score) / 18.0) * 100))
+
+    # Final detection status based on matching the IP script's severity threshold logic
+    if risk_label in ["Critical", "High"] or is_skip_spam:
+        base_status = "MALICIOUS"
+    elif risk_label == "Medium" or is_voip or twilio_risk >= 30:
+        base_status = "SUSPICIOUS"
+    else:
+        base_status = "LEGITIMATE"
+
+    return threat_score, threat_confidence_level, potential_harm_level, risk_label, base_status
 
 def check_phone_number(raw_phone_number):
     details = []
@@ -144,46 +150,25 @@ def check_phone_number(raw_phone_number):
     
     phone_number = phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.E164)
     country_name = geocoder.description_for_number(parsed_number, "en")
+    
     if country_name:
         details.append(f"Detected Country: {country_name}")
     details.insert(0, f"Analyzing formatted number: {phone_number}")
-    
-    is_safe = True
-    status = "LEGITIMATE / SAFE"
 
-    is_disposable = False
     is_skip_spam = False
-    is_osint_spam = False
     is_voip = False
     twilio_risk = 0
-
-    if check_disposable_status(phone_number):
-        is_safe = False
-        is_disposable = True
-        status = "SUSPICIOUS / DISPOSABLE"
-        details.append("Alert: This is a known TEMPORARY/DISPOSABLE number.")
-    else:
-        details.append("Clean (Not found in known disposable lists).")
 
     try:
         skip_url = f"https://spam.skipcalls.app/check/{phone_number}"
         skip_response = requests.get(skip_url, timeout=5)
         if skip_response.status_code == 200 and skip_response.json().get("is_spam") == True:
-            is_safe = False
             is_skip_spam = True
-            status = "PHISHING / SPAM"
             details.append("Number is flagged in SkipCalls spam database.")
         else:
             details.append("SkipCalls: Clean (No spam records found).")
     except Exception:
         details.append("SkipCalls API connection bypassed.")
-
-    if check_secondary_spam_database(phone_number):
-        is_safe = False
-        is_osint_spam = True
-        if status == "LEGITIMATE / SAFE":
-            status = "SUSPICIOUS / BLACKLISTED"
-        details.append("Number found in secondary OSINT blacklist.")
 
     try:
         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
@@ -209,18 +194,12 @@ def check_phone_number(raw_phone_number):
             if line_type:
                 details.append(f"Line Type: {line_type.capitalize()}")
                 if line_type.lower() in ["nonfixedvoip", "voip"]:
-                    is_safe = False
                     is_voip = True
-                    if status == "LEGITIMATE / SAFE":
-                        status = "SUSPICIOUS / PHISHING"
                     details.append("Suspected non-fixed VoIP number (commonly used to mask identity).")
                     
         if lookup.sms_pumping_risk:
             twilio_risk = lookup.sms_pumping_risk.get('risk_score', 0)
             if twilio_risk > 70: 
-                is_safe = False
-                if status == "LEGITIMATE / SAFE":
-                    status = "PHISHING / FRAUD RISK"
                 details.append(f"Alert: High Fraud Risk Score ({twilio_risk}/100).")
             else:
                 details.append(f"Fraud Risk Score: {twilio_risk}/100 (Acceptable).")
@@ -236,20 +215,27 @@ def check_phone_number(raw_phone_number):
     except Exception:
         details.append("Telecom API check bypassed.")
 
-    if is_safe:
+    if not is_skip_spam and twilio_risk < 30 and not is_voip:
         details.append("No high-risk telecom indicators found.")
 
-    threat_score, likelihood, impact = calculate_threat_metrics(is_disposable, is_skip_spam, is_osint_spam, is_voip, twilio_risk)
+    threat_score, threat_confidence, potential_harm, risk_label, base_status = calculate_threat_metrics(is_skip_spam, is_voip, twilio_risk)
     
+    status_msg = f"{base_status} / {risk_label.upper()} RISK"
+    is_safe = (base_status == "LEGITIMATE")
+
     # Call Centralized Ollama Script
     ai_data = get_ai_analysis(phone_number, "Phone Number", threat_score, details)
 
     return {
-        "status": status,
+        "status": status_msg,
         "is_safe": is_safe,
         "threat_score": threat_score,
-        "likelihood": likelihood,
-        "impact": impact,
+        "threat_confidence": threat_confidence,
+        "potential_harm": potential_harm,
+        "likelihood": threat_confidence, 
+        "impact": potential_harm,        
+        "risk_label": risk_label,
+        "severity": risk_label,
         "ai_impact": ai_data.get("impact_analysis", []),
         "ai_countermeasures": ai_data.get("countermeasures", []),
         "details": details
