@@ -4,17 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Phishing Detection |{% endblock %}</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body class="dark-mode">
+
+<body class="dark-mode auth-booting">
     <div class="app-shell">
         <aside class="sidebar" id="sidebar">
             <a href="/" class="brand" aria-label="PhishGuard home">
-                
                 <span class="brand-copy">
                     <strong>Phishing Detection</strong>
                 </span>
@@ -24,25 +26,58 @@
                 <a href="/" class="side-link {% if request.path == '/' or request.path == '/dashboard' %}active{% endif %}">
                     <i class="fas fa-border-all"></i><span>Dashboard</span><b></b>
                 </a>
+
                 <a href="/url" class="side-link {% if request.path.startswith('/url') %}active{% endif %}">
                     <i class="fas fa-link"></i><span>URL Scanner</span><b></b>
                 </a>
+
                 <a href="/ip" class="side-link {% if request.path.startswith('/ip') %}active{% endif %}">
                     <i class="fas fa-globe"></i><span>IP Intelligence</span><b></b>
                 </a>
+
                 <a href="/phone" class="side-link {% if request.path.startswith('/phone') %}active{% endif %}">
                     <i class="fas fa-phone"></i><span>Phone Verification</span><b></b>
                 </a>
+
                 <a href="/sms" class="side-link {% if request.path.startswith('/sms') %}active{% endif %}">
                     <i class="far fa-comment-alt"></i><span>SMS Analysis</span><b></b>
                 </a>
+
                 <a href="/email" class="side-link {% if request.path.startswith('/email') %}active{% endif %}">
                     <i class="far fa-envelope"></i><span>Email Headers</span><b></b>
                 </a>
+
                 <a href="/qr" class="side-link {% if request.path.startswith('/qr') %}active{% endif %}">
                     <i class="fas fa-qrcode"></i><span>QR Code Scanner</span><b></b>
                 </a>
+
+                <a href="/login" class="side-link {% if request.path.startswith('/login') %}active{% endif %}">
+                    <i class="fas fa-user-shield"></i><span>Login</span><b></b>
+                </a>
             </nav>
+
+            <div class="sidebar-auth">
+                <div id="guest-auth-box" class="auth-state-box hidden">
+                    <p class="auth-small-text">Guest mode</p>
+
+                    <a href="/login" class="sidebar-login-btn">
+                        <i class="fas fa-right-to-bracket"></i>
+                        <span>Login</span>
+                    </a>
+                </div>
+
+                <div id="user-auth-box" class="auth-state-box hidden">
+                    <p class="auth-small-text">Signed in</p>
+
+                    <strong id="auth-user-name">User</strong>
+                    <small id="auth-user-email"></small>
+
+                    <button id="logout-btn" type="button" class="sidebar-logout-btn">
+                        <i class="fas fa-right-from-bracket"></i>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
 
             <button id="sidebar-toggle" class="collapse-control" type="button" aria-label="Collapse sidebar">
                 <i class="fas fa-times"></i>
@@ -56,5 +91,6 @@
     </div>
 
     <script src="/static/js/script.js"></script>
+    <script type="module" src="/static/js/firebase-auth.js"></script>
 </body>
 </html>

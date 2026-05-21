@@ -92,7 +92,7 @@ async def index(request: Request):
 
 @app.get("/{page}", response_class=HTMLResponse)
 async def serve_page(request: Request, page: str):
-    valid_pages = ["dashboard", "email", "ip", "phone", "url", "sms", "qr"]
+    valid_pages = ["dashboard", "email", "ip", "phone", "url", "sms", "qr", "login"]
     if page in valid_pages:
         return templates.TemplateResponse(request, f"{page}.html")
     return HTMLResponse("Page not found", status_code=404)

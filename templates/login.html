@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Login | Phishing Detection{% endblock %}
+
+{% block content %}
+<section class="flip-auth-page">
+    <div class="flip-auth-scene">
+        <div class="flip-auth-card" id="flip-auth-card">
+
+            <!-- Login Side -->
+            <div class="flip-auth-face flip-auth-front">
+                <form id="login-form" class="flip-auth-form">
+                    <h1>Login</h1>
+
+                    <input
+                        id="login-email"
+                        type="email"
+                        placeholder="Email Address"
+                        autocomplete="email"
+                        required
+                    >
+
+                    <input
+                        id="login-password"
+                        type="password"
+                        placeholder="Password"
+                        autocomplete="current-password"
+                        required
+                    >
+
+                    <button type="submit" class="flip-main-btn">
+                        Sign In
+                    </button>
+
+                    <button type="button" class="flip-google-btn google-login-btn">
+                        <span class="google-letter">G</span>
+                        Continue with Google
+                    </button>
+
+                    <p id="login-message" class="flip-auth-message"></p>
+
+                    <button type="button" class="flip-switch-link" id="show-signup-btn">
+                        Don’t have an account? Sign Up
+                    </button>
+                </form>
+            </div>
+
+            <!-- Sign Up Side -->
+            <div class="flip-auth-face flip-auth-back">
+                <form id="register-form" class="flip-auth-form">
+                    <h1>Sign Up</h1>
+
+                    <input
+                        id="register-email"
+                        type="email"
+                        placeholder="Email Address"
+                        autocomplete="email"
+                        required
+                    >
+
+                    <input
+                        id="register-password"
+                        type="password"
+                        placeholder="Create Password"
+                        autocomplete="new-password"
+                        minlength="6"
+                        required
+                    >
+
+                    <input
+                        id="register-confirm-password"
+                        type="password"
+                        placeholder="Confirm Password"
+                        autocomplete="new-password"
+                        minlength="6"
+                        required
+                    >
+
+                    <button type="submit" class="flip-main-btn signup-btn">
+                        Sign Up
+                    </button>
+
+                    <button type="button" class="flip-google-btn google-login-btn">
+                        <span class="google-letter">G</span>
+                        Continue with Google
+                    </button>
+
+                    <p id="register-message" class="flip-auth-message"></p>
+
+                    <button type="button" class="flip-switch-link" id="show-login-btn">
+                        Already have an account? Sign In
+                    </button>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</section>
+{% endblock %}
