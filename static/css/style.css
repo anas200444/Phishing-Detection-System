@@ -1731,3 +1731,77 @@ body.auth-ready .sidebar-auth {
 body.sidebar-collapsed .sidebar-auth {
     display: none;
 }
+.password-wrapper {
+    position: relative;
+    width: 100%;
+    margin-bottom: 18px;
+}
+
+.password-wrapper input {
+    margin-bottom: 0 !important;
+    padding-right: 45px;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    transition: color var(--transition);
+}
+
+.toggle-password:hover {
+    color: var(--cyan);
+}
+
+.forgot-link {
+    align-self: flex-end;
+    margin-top: -10px;
+    margin-bottom: 18px;
+    font-size: 13px;
+}
+.strength-meter {
+    width: 100%;
+    margin-top: -12px;
+    margin-bottom: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.strength-meter.hidden {
+    display: none;
+}
+
+.strength-bar {
+    height: 4px;
+    width: 0%;
+    background-color: transparent;
+    border-radius: 2px;
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.strength-text {
+    font-size: 11px;
+    font-weight: 800;
+    align-self: flex-end;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.strength-bar.weak { width: 33%; background-color: var(--danger-text); }
+.strength-text.weak { color: var(--danger-text); }
+
+.strength-bar.medium { width: 66%; background-color: var(--orange); }
+.strength-text.medium { color: var(--orange); }
+
+.strength-bar.strong { width: 100%; background-color: var(--safe-text); }
+.strength-text.strong { color: var(--safe-text); }

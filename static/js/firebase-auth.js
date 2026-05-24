@@ -5,7 +5,8 @@ import {
     signInWithEmailAndPassword,
     signInWithPopup,
     signOut,
-    onAuthStateChanged
+    onAuthStateChanged,
+    sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
 import { auth, googleProvider } from "./firebase-init.js";
@@ -26,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const googleLoginBtns = document.querySelectorAll(".google-login-btn");
 
     const logoutBtn = document.getElementById("logout-btn");
+    const forgotPasswordBtn = document.getElementById("forgot-password-btn");
 
     const guestBox = document.getElementById("guest-auth-box");
     const userBox = document.getElementById("user-auth-box");
@@ -34,6 +36,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const loginMessage = document.getElementById("login-message");
     const registerMessage = document.getElementById("register-message");
+
+    const togglePasswordBtns = document.querySelectorAll(".toggle-password");
+
+    togglePasswordBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            const targetId = btn.getAttribute("data-target");
+            const input = document.getElementById(targetId);
+            const icon = btn.querySelector("i");
+            
+            if (input.type === "password") {
+                input.type = "text";
+                icon.classList.remove("fa-eye");
+                icon.classList.add("fa-eye-slash");
+            } else {
+                input.type = "password";
+                icon.classList.remove("fa-eye-slash");
+                icon.classList.add("fa-eye");
+            }
+        });
+    });
 
     function showMessage(element, message, type = "error") {
         if (!element) return;
@@ -57,8 +79,16 @@ document.addEventListener("DOMContentLoaded", () => {
     function cleanFirebaseError(error) {
         const code = error?.code || "";
 
-        if (code === "auth/email-already-in-use") {
-            return "This email is already registered.";
+        if (
+            code === "auth/invalid-credential" ||
+            code === "auth/wrong-password" ||
+            code === "auth/user-not-found" ||
+            code === "auth/email-already-in-use"
+        ) {
+            return "Invalid email or password.";
+        }
+        if (code === "auth/too-many-requests") {
+            return "Too many failed attempts. Please try again later.";
         }
 
         if (code === "auth/invalid-email") {
@@ -67,14 +97,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (code === "auth/weak-password") {
             return "Password is too weak. Use at least 6 characters.";
-        }
-
-        if (
-            code === "auth/invalid-credential" ||
-            code === "auth/wrong-password" ||
-            code === "auth/user-not-found"
-        ) {
-            return "Wrong email or password.";
         }
 
         if (code === "auth/popup-closed-by-user") {
@@ -146,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             return userData;
-        } catch {
+                } catch {
             localStorage.removeItem(AUTH_CACHE_KEY);
             return null;
         }
@@ -171,6 +193,22 @@ document.addEventListener("DOMContentLoaded", () => {
         showLoginBtn.addEventListener("click", () => {
             clearMessages();
             flipCard.classList.remove("is-flipped");
+        });
+    }
+
+    if (forgotPasswordBtn) {
+        forgotPasswordBtn.addEventListener("click", async () => {
+            const email = document.getElementById("login-email").value.trim();
+            if (!email) {
+                showMessage(loginMessage, "Please enter your email address first.", "error");
+                return;
+            }
+            try {
+                await sendPasswordResetEmail(auth, email);
+                showMessage(loginMessage, "If the email is registered, a reset link has been sent.", "success");
+            } catch (error) {
+                showMessage(loginMessage, "If the email is registered, a reset link has been sent.", "success");
+            }
         });
     }
 
@@ -255,6 +293,54 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    const registerPasswordInput = document.getElementById("register-password");
+    const strengthMeter = document.getElementById("strength-meter");
+    const strengthBar = strengthMeter?.querySelector(".strength-bar");
+    const strengthText = strengthMeter?.querySelector(".strength-text");
+
+    if (registerPasswordInput && strengthMeter) {registerPasswordInput.addEventListener("input", (e) => {
+        const val = e.target.value;
+        
+        if (val.length === 0) {
+            strengthMeter.classList.add("hidden");
+            return;
+        }
+        
+        strengthMeter.classList.remove("hidden");
+        
+        const hasLower = /[a-z]/.test(val);
+        const hasUpper = /[A-Z]/.test(val);
+        const hasNumber = /[0-9]/.test(val);
+        const hasSpecial = /[^a-zA-Z0-9]/.test(val);
+        const isLength12 = val.length >= 12; 
+        const isLength6 = val.length >= 6;
+
+        let strength = 1;
+
+        if (isLength12 && hasLower && hasUpper && hasNumber && hasSpecial) {
+            strength = 3;
+        } else if (isLength6 && (hasLower || hasUpper) && (hasNumber || hasSpecial)) {
+            strength = 2;
+        }
+
+        strengthBar.className = "strength-bar";
+        strengthText.className = "strength-text";
+
+        if (strength === 1) {
+            strengthBar.classList.add("weak");
+            strengthText.classList.add("weak");
+            strengthText.textContent = "Weak";
+        } else if (strength === 2) {
+            strengthBar.classList.add("medium");
+            strengthText.classList.add("medium");
+            strengthText.textContent = "Medium";
+        } else if (strength === 3) {
+            strengthBar.classList.add("strong");
+            strengthText.classList.add("strong");
+            strengthText.textContent = "Strong";
+        }
+        });
+    }
     onAuthStateChanged(auth, (user) => {
         if (user) {
             saveCachedUser(user);

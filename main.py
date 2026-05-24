@@ -18,7 +18,7 @@ sub_folders = ["URL", "IP_Address", "Email", "Phone", "SMS", "qr"]
 for folder in sub_folders:
     folder_path = os.path.join(current_dir, folder)
     if folder_path not in sys.path:
-        sys.path.insert(0, folder_path)
+        sys.path.append(folder_path)
 
 # ---  Imports ---
 try:

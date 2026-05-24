@@ -7,7 +7,6 @@
     <div class="flip-auth-scene">
         <div class="flip-auth-card" id="flip-auth-card">
 
-            <!-- Login Side -->
             <div class="flip-auth-face flip-auth-front">
                 <form id="login-form" class="flip-auth-form">
                     <h1>Login</h1>
@@ -20,13 +19,22 @@
                         required
                     >
 
-                    <input
-                        id="login-password"
-                        type="password"
-                        placeholder="Password"
-                        autocomplete="current-password"
-                        required
-                    >
+                    <div class="password-wrapper">
+                        <input
+                            id="login-password"
+                            type="password"
+                            placeholder="Password"
+                            autocomplete="current-password"
+                            required
+                        >
+                        <button type="button" class="toggle-password" data-target="login-password">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+
+                    <button type="button" id="forgot-password-btn" class="flip-switch-link forgot-link">
+                        Forgot Password?
+                    </button>
 
                     <button type="submit" class="flip-main-btn">
                         Sign In
@@ -45,7 +53,6 @@
                 </form>
             </div>
 
-            <!-- Sign Up Side -->
             <div class="flip-auth-face flip-auth-back">
                 <form id="register-form" class="flip-auth-form">
                     <h1>Sign Up</h1>
@@ -58,23 +65,38 @@
                         required
                     >
 
-                    <input
-                        id="register-password"
-                        type="password"
-                        placeholder="Create Password"
-                        autocomplete="new-password"
-                        minlength="6"
-                        required
-                    >
+                    <div class="password-wrapper">
+                        <input
+                            id="register-password"
+                            type="password"
+                            placeholder="Create Password"
+                            autocomplete="new-password"
+                            minlength="6"
+                            required
+                        >
+                        <button type="button" class="toggle-password" data-target="register-password">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="strength-meter hidden" id="strength-meter">
+                        <div class="strength-bar"></div>
+                        <span class="strength-text"></span>
+                    </div>
 
-                    <input
-                        id="register-confirm-password"
-                        type="password"
-                        placeholder="Confirm Password"
-                        autocomplete="new-password"
-                        minlength="6"
-                        required
-                    >
+                    <div class="password-wrapper">
+                        <input
+                            id="register-confirm-password"
+                            type="password"
+                            placeholder="Confirm Password"
+                            autocomplete="new-password"
+                            minlength="6"
+                            required
+                        >
+                        <button type="button" class="toggle-password" data-target="register-confirm-password">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
 
                     <button type="submit" class="flip-main-btn signup-btn">
                         Sign Up
