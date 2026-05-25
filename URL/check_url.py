@@ -1,86 +1,120 @@
 import os
-import joblib
-import urllib.parse
-from url_utils import is_valid_url_format, ensure_url_scheme
-from api_services import check_virustotal, check_google_safe_browsing, get_url_intelligence, api_has_usable_result
-from model_pipeline import predict_single_url
+import sys
+import concurrent.futures
 
-def evaluate_url(target_url: str) -> dict:
-    """
-    Evaluates a URL using Threat Intel APIs and constructs HTML-safe result strings.
-    """
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path: sys.path.insert(0, root_dir)
+
+try:
+    from ollama_analyzer import get_ai_analysis
+except ImportError:
+    def get_ai_analysis(*args, **kwargs): return {"impact_analysis": [], "countermeasures": []}
+
+from url_utils import (ensure_url_scheme, is_valid_url_format, load_threat_lists, 
+                       is_tranco_whitelisted, URLHAUS_SET, detect_typosquatting_and_homograph)
+from url_apis import check_virustotal, check_google_safe_browsing, check_otx_url, get_url_intelligence, get_valid_screenshot
+from url_scoring import calculate_url_threat_metrics
+
+def evaluate_url(target_url):
     target_url = ensure_url_scheme(target_url)
     if not is_valid_url_format(target_url):
-        return {
-            "is_safe": False,
-            "status": "Please enter a valid URL",
-            "details": ["Please enter a valid URL or domain (e.g., example.com)"]
-        }
+        return {"status": "ERROR", "is_safe": False, "details": ["Please enter a valid URL (e.g., example.com)"], "screenshot_url": None}
 
+    load_threat_lists()
     details = []
-    is_safe = True
-    screenshot_url = None  # Will hold the plain URL for the front-end
 
-    # Primary API Checks
-    vt_results = check_virustotal(target_url)
-    gsb_results = check_google_safe_browsing(target_url)
-    
-    # Microlink Screenshot URL (direct image URL via embed parameter)
-    encoded_url = urllib.parse.quote(target_url, safe='')
-    screenshot_url = f"https://api.microlink.io/?url={encoded_url}&screenshot=true&meta=false&embed=screenshot.url"
+    # Parallel lookups (Added screenshot API here)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        f_vt = executor.submit(check_virustotal, target_url)
+        f_gsb = executor.submit(check_google_safe_browsing, target_url)
+        f_otx = executor.submit(check_otx_url, target_url)
+        f_intel = executor.submit(get_url_intelligence, target_url)
+        f_screen = executor.submit(get_valid_screenshot, target_url)
 
-    if api_has_usable_result(vt_results, gsb_results):
-        details.append("Analysis completed via Threat Intelligence APIs.")
+        vt_result = f_vt.result()
+        gsb_result = f_gsb.result()
+        otx_result = f_otx.result()
+        intel = f_intel.result()
+        screenshot_url = f_screen.result()
+
+    is_whitelisted, tranco_domain = is_tranco_whitelisted(target_url)
+    urlhaus_malicious = target_url in URLHAUS_SET
+    brand_result = detect_typosquatting_and_homograph(target_url)
+
+    # 1. Evaluate Metrics
+    threat_score, tc_lvl, ph_lvl, risk_label, base_status, evidence_conf = calculate_url_threat_metrics(
+        vt_result, gsb_result, otx_result, urlhaus_malicious, brand_result, is_whitelisted
+    )
+
+    # 2. Status Output Formatting
+    status_msg = f"{base_status} / {risk_label.upper()} RISK"
+    is_safe = (base_status == "LEGITIMATE")
+
+    # 3. Assemble Details (Does not skip layers; applies whitelist note if found)
+    if is_whitelisted:
+        details.append(f"Top 1 Million Whitelist: Root domain '{tranco_domain}' found (Classified as Legitimate).")
+
+    vt_mal = vt_result.get("stats", {}).get("malicious", 0)
+    if vt_mal > 0:
+        msg = f"VirusTotal flagged as Malicious ({vt_mal} engines)."
+        if is_whitelisted: msg += " (Ignored due to exact whitelist presence)"
+        details.append(msg)
+    elif not vt_result.get("error"):
+        details.append("VirusTotal: Clean.")
         
-        # Google Safe Browsing Result
-        if "error" not in gsb_results:
-            if gsb_results.get("is_malicious"):
-                is_safe = False
-                details.append("Google Safe Browsing: Flagged as Malicious/Phishing.")
-            else:
-                details.append("Google Safe Browsing: Clean.")
+    if gsb_result.get("is_malicious"): 
+        msg = "Google Safe Browsing flagged as Malicious/Phishing."
+        if is_whitelisted: msg += " (Ignored due to exact whitelist presence)"
+        details.append(msg)
+    else: 
+        details.append("Google Safe Browsing: Clean.")
+
+    if otx_result.get("found"): 
+        msg = f"AlienVault OTX flagged URL in {otx_result['pulse_count']} threat intelligence pulse(s)."
+        if is_whitelisted: msg += " (Ignored due to exact whitelist presence)"
+        details.append(msg)
+    else: 
+        details.append("AlienVault OTX: Clear.")
+
+    if urlhaus_malicious: 
+        msg = "URLhaus Database: URL actively flagged as malware distribution."
+        if is_whitelisted: msg += " (Ignored due to exact whitelist presence)"
+        details.append(msg)
         
-        # VirusTotal Result
-        if "error" not in vt_results:
-            stats = vt_results.get('stats', {})
-            malicious_count = stats.get('malicious', 0)
-            if malicious_count > 0 or vt_results.get('reputation', 0) < 0:
-                is_safe = False
-                details.append(f"VirusTotal: Flagged as Malicious ({malicious_count} detections).")
-            else:
-                details.append("VirusTotal: Clean (No malicious signatures found).")
+    b = brand_result.get("matched_brand")
+    b_txt = f" Matched brand: {b}." if b else ""
+    if brand_result.get("homograph_risk") == 1:
+        details.append(f"Homograph Attack: Domain uses deceiving characters to mimic trusted domain.{b_txt}")
+    if brand_result.get("typosquat_risk") == 1:
+        details.append(f"Typosquatting: Domain closely imitates a trusted domain.{b_txt}")
 
-        # Metadata Enrichment
-        intel = get_url_intelligence(target_url)
-        details.append(f"Resolved IP: {intel.get('ip')}")
-        details.append(f"Hosting Location: {intel.get('country')}")
-        details.append(f"ISP / Provider: {intel.get('isp')}")
-        details.append(f"Domain Registered On: {intel.get('created')}")
-
+    # Append Intelligence
+    details.append("--- Domain Intelligence ---")
+    details.append(f"Resolved IP: {intel['ip']}")
+    details.append(f"Hosting Location: {intel['country']}")
+    details.append(f"ISP / Provider: {intel['isp']}")
+    details.append(f"Registrant / Org: {intel['org']}")
+    if intel['age_days'] >= 0:
+        details.append(f"Domain Registered On: {intel['created']} (Age: {intel['age_days']} days)")
     else:
-        # ML Fallback
-        details.append("API results unavailable. Analyzing via local ML model.")
-        try:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            model_path = os.path.join(current_dir, "Phishing_URL_pipeline.pkl")
-            
-            if os.path.exists(model_path):
-                data = joblib.load(model_path)
-                label, _ = predict_single_url(target_url, data['pipeline'], data['threshold'])
-                
-                if label.lower() == "phishing":
-                    is_safe = False
-                    details.append("ML Model Verdict: Detected high-risk")
-                else:
-                    details.append("ML Model Verdict: URL appears legitimate.")
-            else:
-                return {"is_safe": False, "status": "ANALYSIS FAILED", "details": ["Model artifacts missing."]}
-        except Exception as e:
-            return {"is_safe": False, "status": "ERROR", "details": [f"ML failed: {str(e)}"]}
+        details.append(f"Domain Registered On: {intel['created']}")
+
+    # 4. Trigger AI
+    ai_data = get_ai_analysis(target_url, "URL", threat_score, details)
 
     return {
+        "status": status_msg,
         "is_safe": is_safe,
-        "status": "LEGITIMATE / SAFE" if is_safe else "PHISHING / MALICIOUS",
+        "threat_score": threat_score,
+        "threat_confidence": tc_lvl,
+        "potential_harm": ph_lvl,
+        "likelihood": tc_lvl,
+        "impact": ph_lvl,
+        "risk_label": risk_label,
+        "severity": risk_label,
+        "ai_impact": ai_data.get("impact_analysis", []),
+        "ai_countermeasures": ai_data.get("countermeasures", []),
         "details": details,
-        "screenshot_url": screenshot_url if api_has_usable_result(vt_results, gsb_results) else None
+        "screenshot_url": screenshot_url
     }
