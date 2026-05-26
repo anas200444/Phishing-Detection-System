@@ -1,72 +1,161 @@
 {% extends "base.html" %}
 {% block title %}Phishing Detection |{% endblock %}
+
 {% block content %}
 <section class="dashboard-screen">
-    <div class="dashboard-intro">
-        <div class="system-status"><span></span> ONLINE</div>
-        <h1>Phishing <em>Detection</em></h1>
-        <p> threat detection across all attack vectors.</p>
-    </div>
 
-    <div class="stats-grid" aria-label="Security statistics">
-        <article class="stat-card stat-cyan">
-            <div class="stat-meta"><span>Total Scans</span><i class="fas fa-bolt"></i></div>
-            <strong>0</strong>
-        </article>
-        <article class="stat-card stat-red">
-            <div class="stat-meta"><span>Threats Found</span><i class="fas fa-exclamation-triangle"></i></div>
-            <strong>0</strong>
-        </article>
-        <article class="stat-card stat-green">
-            <div class="stat-meta"><span>Safe Results</span><i class="fas fa-check-circle"></i></div>
-            <strong>0</strong>
-        </article>
-        <article class="stat-card stat-purple">
-            <div class="stat-meta"><span>Accuracy Rate</span><i class="fas fa-fingerprint"></i></div>
-            <strong>0%</strong>
-        </article>
-    </div>
-
-    <section class="modules-panel">
-        <h2><i class="fas fa-bolt"></i> Detection Modules</h2>
-        <div class="module-grid">
-            <a href="/url" class="module-tile tile-url">
-                <i class="fas fa-link"></i>
-                <h3>URL Scanner</h3>
-                <p>Analyze links for malicious domains and phishing attempts.</p>
-                <span>Open scanner <i class="fas fa-chevron-right"></i></span>
-            </a>
-            <a href="/ip" class="module-tile tile-ip">
-                <i class="fas fa-globe"></i>
-                <h3>IP Intelligence</h3>
-                <p>Trace IP addresses to check against global threat databases.</p>
-                <span>Open scanner <i class="fas fa-chevron-right"></i></span>
-            </a>
-            <a href="/phone" class="module-tile tile-phone">
-                <i class="fas fa-phone"></i>
-                <h3>Phone Verification</h3>
-                <p>Detect spoofed numbers and known scam caller IDs.</p>
-                <span>Open scanner <i class="fas fa-chevron-right"></i></span>
-            </a>
-            <a href="/sms" class="module-tile tile-sms">
-                <i class="far fa-comment-alt"></i>
-                <h3>SMS Analysis</h3>
-                <p>Scan text messages for social engineering tactics.</p>
-                <span>Open scanner <i class="fas fa-chevron-right"></i></span>
-            </a>
-            <a href="/email" class="module-tile tile-email">
-                <i class="far fa-envelope"></i>
-                <h3>Email Headers</h3>
-                <p>Analyze email senders to detect sender spoofing.</p>
-                <span>Open scanner <i class="fas fa-chevron-right"></i></span>
-            </a>
-            <a href="/qr" class="module-tile tile-qr">
-                <i class="fas fa-qrcode"></i>
-                <h3>QR Code Scanner</h3>
-                <p>Extract and analyze embedded URLs safely from images.</p>
-                <span>Open scanner <i class="fas fa-chevron-right"></i></span>
-            </a>
+    <section id="normal-dashboard-view">
+        <div class="dashboard-intro">
+            <div class="system-status"><span></span> ONLINE</div>
+            <h1>Phishing <em>Detection</em></h1>
+            <p>Threat detection across all attack vectors.</p>
         </div>
+
+        <section class="modules-panel">
+            <h2><i class="fas fa-bolt"></i> Detection Modules</h2>
+
+            <div class="module-grid">
+                <a href="/url" class="module-tile tile-url">
+                    <i class="fas fa-link"></i>
+                    <h3>URL Scanner</h3>
+                    <p>Analyze links for malicious domains and phishing attempts.</p>
+                    <span>Open scanner <i class="fas fa-chevron-right"></i></span>
+                </a>
+
+                <a href="/ip" class="module-tile tile-ip">
+                    <i class="fas fa-globe"></i>
+                    <h3>IP Intelligence</h3>
+                    <p>Trace IP addresses to check against global threat databases.</p>
+                    <span>Open scanner <i class="fas fa-chevron-right"></i></span>
+                </a>
+
+                <a href="/phone" class="module-tile tile-phone">
+                    <i class="fas fa-phone"></i>
+                    <h3>Phone Verification</h3>
+                    <p>Detect spoofed numbers and known scam caller IDs.</p>
+                    <span>Open scanner <i class="fas fa-chevron-right"></i></span>
+                </a>
+
+                <a href="/sms" class="module-tile tile-sms">
+                    <i class="far fa-comment-alt"></i>
+                    <h3>SMS Analysis</h3>
+                    <p>Scan text messages for social engineering tactics.</p>
+                    <span>Open scanner <i class="fas fa-chevron-right"></i></span>
+                </a>
+
+                <a href="/email" class="module-tile tile-email">
+                    <i class="far fa-envelope"></i>
+                    <h3>Email Headers</h3>
+                    <p>Analyze email senders to detect sender spoofing.</p>
+                    <span>Open scanner <i class="fas fa-chevron-right"></i></span>
+                </a>
+
+                <a href="/qr" class="module-tile tile-qr">
+                    <i class="fas fa-qrcode"></i>
+                    <h3>QR Code Scanner</h3>
+                    <p>Extract and analyze embedded URLs safely from images.</p>
+                    <span>Open scanner <i class="fas fa-chevron-right"></i></span>
+                </a>
+
+                <a href="/report" class="module-tile tile-report">
+                    <i class="fas fa-flag"></i>
+                    <h3>Report Indicator</h3>
+                    <p>Submit suspicious URLs, IPs, phone numbers, SMS content, and emails.</p>
+                    <span>Open report form <i class="fas fa-chevron-right"></i></span>
+                </a>
+            </div>
+        </section>
     </section>
+
+    <section id="admin-dashboard-view" class="hidden">
+        <div class="dashboard-intro">
+            <div class="system-status"><span></span> ADMIN MODE</div>
+            <h1>Reports <em>Dashboard</em></h1>
+            <p>Review malicious indicator reports, update status, and export reports as CSV.</p>
+        </div>
+
+        <div class="stats-grid admin-stats-grid" aria-label="Report statistics">
+            <article class="stat-card stat-cyan">
+                <div class="stat-meta"><span>Total Reports</span></div>
+                <strong id="admin-total-reports">0</strong>
+            </article>
+
+            <article class="stat-card stat-red">
+                <div class="stat-meta"><span>Pending</span></div>
+                <strong id="admin-pending-reports">0</strong>
+            </article>
+
+            <article class="stat-card stat-green">
+                <div class="stat-meta"><span>Confirmed</span></div>
+                <strong id="admin-confirmed-reports">0</strong>
+            </article>
+
+            <article class="stat-card stat-purple">
+                <div class="stat-meta"><span>Ignored / False</span></div>
+                <strong id="admin-ignored-reports">0</strong>
+            </article>
+        </div>
+
+        <section class="admin-review-panel">
+            <div class="admin-review-header">
+                <div>
+                    <h2 class="report-section-title">
+                        <i class="fas fa-list-check"></i>
+                        Reported Indicators
+                    </h2>
+                    <p>Change report status, view report count, and download the CSV file.</p>
+                </div>
+
+                <div class="admin-review-actions">
+                    <select id="admin-type-filter">
+                        <option value="all">All Types</option>
+                        <option value="url">URLs</option>
+                        <option value="ip">IP Addresses</option>
+                        <option value="phone">Phone Numbers</option>
+                        <option value="sms">SMS Content</option>
+                        <option value="email">Emails</option>
+                    </select>
+
+                    <button id="refresh-reports-btn" class="admin-action-btn" type="button">
+                        <i class="fas fa-rotate"></i>
+                        Refresh
+                    </button>
+
+                    <button id="download-csv-btn" class="admin-action-btn csv-btn" type="button">
+                        <i class="fas fa-file-csv"></i>
+                        Download CSV
+                    </button>
+                </div>
+            </div>
+
+            <div id="admin-message" class="report-message"></div>
+
+            <div class="reports-table-wrapper">
+                <table class="reports-table">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Indicator</th>
+                            <th>Reports</th>
+                            <th>Status</th>
+                            <th>Reported By</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="reports-table-body">
+                        <tr>
+                            <td colspan="6" class="empty-table">Loading reports...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </section>
+
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/js/dashboard-admin.js?v=10"></script>
 {% endblock %}

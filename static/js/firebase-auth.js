@@ -13,17 +13,14 @@ import { auth, googleProvider } from "./firebase-init.js";
 
 document.addEventListener("DOMContentLoaded", () => {
     const AUTH_CACHE_KEY = "phishing_detection_auth_user";
-
     const body = document.body;
 
     const flipCard = document.getElementById("flip-auth-card");
-
     const showSignupBtn = document.getElementById("show-signup-btn");
     const showLoginBtn = document.getElementById("show-login-btn");
 
     const loginForm = document.getElementById("login-form");
     const registerForm = document.getElementById("register-form");
-
     const googleLoginBtns = document.querySelectorAll(".google-login-btn");
 
     const logoutBtn = document.getElementById("logout-btn");
@@ -44,7 +41,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const targetId = btn.getAttribute("data-target");
             const input = document.getElementById(targetId);
             const icon = btn.querySelector("i");
-            
+
+            if (!input || !icon) return;
+
             if (input.type === "password") {
                 input.type = "text";
                 icon.classList.remove("fa-eye");
@@ -57,9 +56,35 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    async function syncBackendSession(user) {
+        if (!user) return;
+
+        try {
+            const idToken = await user.getIdToken();
+
+            await fetch("/api/auth/session", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${idToken}`
+                }
+            });
+        } catch (error) {
+            console.error("Backend session sync failed:", error);
+        }
+    }
+
+    async function clearBackendSession() {
+        try {
+            await fetch("/api/auth/logout", {
+                method: "POST"
+            });
+        } catch (error) {
+            console.error("Backend session clear failed:", error);
+        }
+    }
+
     function showMessage(element, message, type = "error") {
         if (!element) return;
-
         element.textContent = message;
         element.className = `flip-auth-message ${type}`;
     }
@@ -87,6 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ) {
             return "Invalid email or password.";
         }
+
         if (code === "auth/too-many-requests") {
             return "Too many failed attempts. Please try again later.";
         }
@@ -111,13 +137,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function setAuthReady() {
-        if (!body) return;
-
         body.classList.remove("auth-booting");
         body.classList.add("auth-ready");
     }
 
     function showGuestState() {
+        body.classList.remove("is-authenticated");
+        body.classList.add("is-guest");
+
         if (guestBox) guestBox.classList.remove("hidden");
         if (userBox) userBox.classList.add("hidden");
 
@@ -128,6 +155,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function showUserState(userData) {
+        body.classList.remove("is-guest");
+        body.classList.add("is-authenticated");
+
         if (guestBox) guestBox.classList.add("hidden");
         if (userBox) userBox.classList.remove("hidden");
 
@@ -168,10 +198,15 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             return userData;
-                } catch {
+        } catch {
             localStorage.removeItem(AUTH_CACHE_KEY);
             return null;
         }
+    }
+
+    async function goHomeAfterLogin(user) {
+        await syncBackendSession(user);
+        window.location.href = "/";
     }
 
     const cachedUser = loadCachedUser();
@@ -199,14 +234,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (forgotPasswordBtn) {
         forgotPasswordBtn.addEventListener("click", async () => {
             const email = document.getElementById("login-email").value.trim();
+
             if (!email) {
                 showMessage(loginMessage, "Please enter your email address first.", "error");
                 return;
             }
+
             try {
                 await sendPasswordResetEmail(auth, email);
                 showMessage(loginMessage, "If the email is registered, a reset link has been sent.", "success");
-            } catch (error) {
+            } catch {
                 showMessage(loginMessage, "If the email is registered, a reset link has been sent.", "success");
             }
         });
@@ -224,7 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 saveCachedUser(result.user);
                 showUserState(result.user);
                 showMessage(loginMessage, "Logged in successfully.", "success");
-                window.location.href = "/";
+                await goHomeAfterLogin(result.user);
             } catch (error) {
                 showMessage(loginMessage, cleanFirebaseError(error), "error");
             }
@@ -254,7 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 saveCachedUser(result.user);
                 showUserState(result.user);
                 showMessage(registerMessage, "Account created successfully.", "success");
-                window.location.href = "/";
+                await goHomeAfterLogin(result.user);
             } catch (error) {
                 showMessage(registerMessage, cleanFirebaseError(error), "error");
             }
@@ -267,7 +304,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const result = await signInWithPopup(auth, googleProvider);
                 saveCachedUser(result.user);
                 showUserState(result.user);
-                window.location.href = "/";
+                await goHomeAfterLogin(result.user);
             } catch (error) {
                 const visibleMessage = flipCard?.classList.contains("is-flipped")
                     ? registerMessage
@@ -282,6 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
         logoutBtn.addEventListener("click", async () => {
             try {
                 localStorage.removeItem(AUTH_CACHE_KEY);
+                await clearBackendSession();
                 showGuestState();
 
                 await signOut(auth);
@@ -298,55 +336,59 @@ document.addEventListener("DOMContentLoaded", () => {
     const strengthBar = strengthMeter?.querySelector(".strength-bar");
     const strengthText = strengthMeter?.querySelector(".strength-text");
 
-    if (registerPasswordInput && strengthMeter) {registerPasswordInput.addEventListener("input", (e) => {
-        const val = e.target.value;
-        
-        if (val.length === 0) {
-            strengthMeter.classList.add("hidden");
-            return;
-        }
-        
-        strengthMeter.classList.remove("hidden");
-        
-        const hasLower = /[a-z]/.test(val);
-        const hasUpper = /[A-Z]/.test(val);
-        const hasNumber = /[0-9]/.test(val);
-        const hasSpecial = /[^a-zA-Z0-9]/.test(val);
-        const isLength12 = val.length >= 12; 
-        const isLength6 = val.length >= 6;
+    if (registerPasswordInput && strengthMeter) {
+        registerPasswordInput.addEventListener("input", (event) => {
+            const val = event.target.value;
 
-        let strength = 1;
+            if (val.length === 0) {
+                strengthMeter.classList.add("hidden");
+                return;
+            }
 
-        if (isLength12 && hasLower && hasUpper && hasNumber && hasSpecial) {
-            strength = 3;
-        } else if (isLength6 && (hasLower || hasUpper) && (hasNumber || hasSpecial)) {
-            strength = 2;
-        }
+            strengthMeter.classList.remove("hidden");
 
-        strengthBar.className = "strength-bar";
-        strengthText.className = "strength-text";
+            const hasLower = /[a-z]/.test(val);
+            const hasUpper = /[A-Z]/.test(val);
+            const hasNumber = /[0-9]/.test(val);
+            const hasSpecial = /[^a-zA-Z0-9]/.test(val);
+            const isLength12 = val.length >= 12;
+            const isLength6 = val.length >= 6;
 
-        if (strength === 1) {
-            strengthBar.classList.add("weak");
-            strengthText.classList.add("weak");
-            strengthText.textContent = "Weak";
-        } else if (strength === 2) {
-            strengthBar.classList.add("medium");
-            strengthText.classList.add("medium");
-            strengthText.textContent = "Medium";
-        } else if (strength === 3) {
-            strengthBar.classList.add("strong");
-            strengthText.classList.add("strong");
-            strengthText.textContent = "Strong";
-        }
+            let strength = 1;
+
+            if (isLength12 && hasLower && hasUpper && hasNumber && hasSpecial) {
+                strength = 3;
+            } else if (isLength6 && (hasLower || hasUpper) && (hasNumber || hasSpecial)) {
+                strength = 2;
+            }
+
+            strengthBar.className = "strength-bar";
+            strengthText.className = "strength-text";
+
+            if (strength === 1) {
+                strengthBar.classList.add("weak");
+                strengthText.classList.add("weak");
+                strengthText.textContent = "Weak";
+            } else if (strength === 2) {
+                strengthBar.classList.add("medium");
+                strengthText.classList.add("medium");
+                strengthText.textContent = "Medium";
+            } else {
+                strengthBar.classList.add("strong");
+                strengthText.classList.add("strong");
+                strengthText.textContent = "Strong";
+            }
         });
     }
-    onAuthStateChanged(auth, (user) => {
+
+    onAuthStateChanged(auth, async (user) => {
         if (user) {
             saveCachedUser(user);
             showUserState(user);
+            await syncBackendSession(user);
         } else {
             localStorage.removeItem(AUTH_CACHE_KEY);
+            await clearBackendSession();
             showGuestState();
         }
     });

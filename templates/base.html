@@ -1,6 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+        (function () {
+            const ADMIN_EMAILS = ["ans0225971@ju.edu.jo"];
+            document.documentElement.classList.add("role-checking-html");
+
+            try {
+                const cached = localStorage.getItem("phishing_detection_auth_user");
+                const user = cached ? JSON.parse(cached) : null;
+                const email = String(user?.email || "").trim().toLowerCase();
+
+                if (ADMIN_EMAILS.includes(email)) {
+                    document.documentElement.classList.add("cached-admin-shell");
+                }
+            } catch {
+                localStorage.removeItem("phishing_detection_auth_user");
+            }
+        })();
+    </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Phishing Detection |{% endblock %}</title>
@@ -9,11 +28,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=9">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 
-<body class="dark-mode auth-booting">
+<body class="dark-mode auth-booting role-checking">
     <div class="app-shell">
         <aside class="sidebar" id="sidebar">
             <a href="/" class="brand" aria-label="PhishGuard home">
@@ -23,35 +42,39 @@
             </a>
 
             <nav class="sidebar-nav" aria-label="Primary navigation">
-                <a href="/" class="side-link {% if request.path == '/' or request.path == '/dashboard' %}active{% endif %}">
+                <a href="/" class="side-link admin-allowed-nav {% if request.path == '/' or request.path == '/dashboard' %}active{% endif %}">
                     <i class="fas fa-border-all"></i><span>Dashboard</span><b></b>
                 </a>
 
-                <a href="/url" class="side-link {% if request.path.startswith('/url') %}active{% endif %}">
+                <a href="/url" class="side-link user-only-nav {% if request.path.startswith('/url') %}active{% endif %}">
                     <i class="fas fa-link"></i><span>URL Scanner</span><b></b>
                 </a>
 
-                <a href="/ip" class="side-link {% if request.path.startswith('/ip') %}active{% endif %}">
+                <a href="/ip" class="side-link user-only-nav {% if request.path.startswith('/ip') %}active{% endif %}">
                     <i class="fas fa-globe"></i><span>IP Intelligence</span><b></b>
                 </a>
 
-                <a href="/phone" class="side-link {% if request.path.startswith('/phone') %}active{% endif %}">
+                <a href="/phone" class="side-link user-only-nav {% if request.path.startswith('/phone') %}active{% endif %}">
                     <i class="fas fa-phone"></i><span>Phone Verification</span><b></b>
                 </a>
 
-                <a href="/sms" class="side-link {% if request.path.startswith('/sms') %}active{% endif %}">
+                <a href="/sms" class="side-link user-only-nav {% if request.path.startswith('/sms') %}active{% endif %}">
                     <i class="far fa-comment-alt"></i><span>SMS Analysis</span><b></b>
                 </a>
 
-                <a href="/email" class="side-link {% if request.path.startswith('/email') %}active{% endif %}">
+                <a href="/email" class="side-link user-only-nav {% if request.path.startswith('/email') %}active{% endif %}">
                     <i class="far fa-envelope"></i><span>Email Headers</span><b></b>
                 </a>
 
-                <a href="/qr" class="side-link {% if request.path.startswith('/qr') %}active{% endif %}">
+                <a href="/qr" class="side-link user-only-nav {% if request.path.startswith('/qr') %}active{% endif %}">
                     <i class="fas fa-qrcode"></i><span>QR Code Scanner</span><b></b>
                 </a>
 
-                <a href="/login" class="side-link {% if request.path.startswith('/login') %}active{% endif %}">
+                <a href="/report" class="side-link user-only-nav {% if request.path.startswith('/report') %}active{% endif %}">
+                    <i class="fas fa-flag"></i><span>Report Indicator</span><b></b>
+                </a>
+
+                <a href="/login" class="side-link guest-only-nav {% if request.path.startswith('/login') %}active{% endif %}">
                     <i class="fas fa-user-shield"></i><span>Login</span><b></b>
                 </a>
             </nav>
@@ -90,7 +113,9 @@
         </main>
     </div>
 
-    <script src="/static/js/script.js"></script>
-    <script type="module" src="/static/js/firebase-auth.js"></script>
+    <script src="/static/js/script.js?v=10"></script>
+<script type="module" src="/static/js/firebase-auth.js?v=10"></script>
+<script type="module" src="/static/js/admin-navigation.js?v=10"></script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -282,7 +282,6 @@ body.sidebar-collapsed .side-link.active {
     box-shadow: 0 0 18px rgba(23, 231, 255, 0.10);
 }
 
-
 .dashboard-screen {
     width: min(100%, 1100px);
     margin: 0 auto;
@@ -801,7 +800,6 @@ textarea#target-input {
     color: var(--danger-text);
 }
 
-
 .module-qr {
     place-items: start center;
     padding-top: clamp(42px, 8vh, 94px);
@@ -923,7 +921,6 @@ textarea#target-input {
 .qr-hidden-input {
     display: none;
 }
-
 
 @media (max-width: 1050px) {
     .stats-grid {
@@ -1721,12 +1718,10 @@ body.auth-ready .sidebar-auth {
     opacity: 1;
 }
 
-
 .sidebar-auth {
     opacity: 1;
     visibility: visible;
 }
-
 
 body.sidebar-collapsed .sidebar-auth {
     display: none;
@@ -1805,3 +1800,376 @@ body.sidebar-collapsed .sidebar-auth {
 
 .strength-bar.strong { width: 100%; background-color: var(--safe-text); }
 .strength-text.strong { color: var(--safe-text); }
+
+
+/* =========================================================
+   Report Form + Admin Dashboard + Role-Based Navigation
+========================================================= */
+
+/* Immediate cached-admin shell before Firebase finishes */
+html.cached-admin-shell .user-only-nav,
+html.cached-admin-shell .guest-only-nav {
+    display: none !important;
+}
+
+html.cached-admin-shell #normal-dashboard-view {
+    display: none !important;
+}
+
+html.cached-admin-shell #admin-dashboard-view {
+    display: block !important;
+}
+
+/* During role checking, never show normal user nav links */
+body.role-checking .user-only-nav,
+body.role-checking .guest-only-nav {
+    display: none !important;
+}
+
+/* Admin: hide all normal user pages and login nav */
+body.is-admin .user-only-nav,
+body.is-admin .guest-only-nav {
+    display: none !important;
+}
+
+body.is-admin .admin-allowed-nav {
+    display: flex !important;
+}
+
+body.is-admin #normal-dashboard-view {
+    display: none !important;
+}
+
+body.is-admin #admin-dashboard-view {
+    display: block !important;
+}
+
+body.is-admin .sidebar-nav {
+    gap: 10px;
+}
+
+/* Logged-in normal users: hide login nav link */
+body.is-authenticated .guest-only-nav {
+    display: none !important;
+}
+
+/* Guests: show login and normal pages */
+body.is-guest .guest-only-nav,
+body.is-guest .user-only-nav {
+    display: flex;
+}
+
+/* Updated Report Screen Layout & Centering */
+.report-screen {
+    max-width: 1200px;
+}
+
+.report-screen .dashboard-intro {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.report-panel,
+.report-auth-card,
+.admin-review-panel {
+    background: rgba(15, 23, 42, 0.82);
+    border: 1px solid rgba(34, 211, 238, 0.25);
+    border-radius: 22px;
+    padding: 28px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    margin: 0 auto 24px auto; /* Centers the panel block horizontally */
+}
+
+.report-panel {
+    max-width: 680px; 
+}
+
+.report-auth-card {
+    text-align: center;
+    max-width: 680px;
+}
+
+.report-auth-card i {
+    font-size: 42px;
+    color: #22d3ee;
+    margin-bottom: 14px;
+}
+
+.report-auth-card h2 {
+    margin: 0 0 10px;
+    color: #fff;
+}
+
+.report-auth-card p {
+    color: #94a3b8;
+    margin-bottom: 22px;
+}
+
+.report-login-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px; 
+    padding: 10px 18px; 
+    font-size: 14px; 
+    border-radius: 12px; 
+    background: linear-gradient(135deg, #06b6d4, #2563eb);
+    color: white;
+    text-decoration: none;
+    font-weight: 700;
+}
+
+.report-section-title {
+    color: #f8fafc;
+    margin: 0 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Hide emojis/icons from the title and button */
+.report-section-title i,
+.report-submit-btn i {
+    display: none !important;
+}
+
+.report-form {
+    display: grid;
+    gap: 18px;
+    max-width: 680px;
+}
+
+.report-form .form-group {
+    display: grid;
+    gap: 8px;
+}
+
+.report-form label {
+    color: #e2e8f0;
+    font-weight: 700;
+}
+
+/* Custom styling to move the dropdown arrow left */
+/* Add this to customize and move the dropdown arrow */
+/* 1. Base styles for both inputs and selects */
+.report-form select,
+.report-form input,
+.admin-review-actions select,
+.status-dropdown {
+    width: 100%;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(2, 6, 23, 0.65);
+    color: #f8fafc;
+    border-radius: 14px;
+    padding: 12px 14px;
+    outline: none;
+    font-size: 14px;
+}
+
+/* 2. Focus states */
+.report-form select:focus,
+.report-form input:focus,
+.admin-review-actions select:focus,
+.status-dropdown:focus {
+    border-color: rgba(34, 211, 238, 0.85);
+    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+}
+
+/* 3. Specific overrides to move the dropdown arrow inward */
+.report-form select,
+.admin-review-actions select,
+.status-dropdown {
+    /* Hide the default browser arrow */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    
+    /* Add custom arrow */
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f8fafc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    
+    /* ADJUST THIS VALUE to move the arrow further left or right */
+    background-position: right 20px center; 
+    
+    background-size: 16px;
+    
+    /* Add extra right padding so your text doesn't overlap the new arrow */
+    padding-right: 45px; 
+}
+
+.report-form small {
+    color: #94a3b8;
+}
+
+.report-submit-btn,
+.admin-action-btn {
+    border: 0;
+    border-radius: 15px;
+    padding: 13px 18px;
+    background: linear-gradient(135deg, #22d3ee, #2563eb);
+    color: white;
+    font-weight: 800;
+    cursor: pointer;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.report-submit-btn {
+    width: fit-content;
+    margin: 0 auto; /* Centers the button inside the form */
+}
+
+.csv-btn {
+    background: linear-gradient(135deg, #22c55e, #15803d);
+}
+
+.report-submit-btn:disabled,
+.admin-action-btn:disabled,
+.status-dropdown:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.report-message {
+    min-height: 24px;
+    font-weight: 700;
+}
+
+.report-message.error {
+    color: #fb7185;
+}
+
+.report-message.success {
+    color: #4ade80;
+}
+
+.tile-report > i {
+    color: #facc15;
+    background: rgba(250, 204, 21, 0.12);
+}
+
+.tile-report span {
+    color: #facc15;
+}
+
+.admin-stats-grid {
+    margin-bottom: 32px;
+}
+
+.admin-review-panel {
+    width: 100%;
+}
+
+.admin-review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.admin-review-header p {
+    margin: 0;
+    color: #94a3b8;
+}
+
+.admin-review-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.admin-review-actions select {
+    min-width: 160px;
+}
+
+/* Updated Table Wrapper to strictly hide horizontal scroll */
+.reports-table-wrapper {
+    overflow-x: hidden; 
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 18px;
+    width: 100%;
+}
+
+/* Updated Table rule to force layout strictly within constraints */
+.reports-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed; 
+}
+
+/* Updated Cell Rules to wrap all overflowing content automatically */
+.reports-table th,
+.reports-table td {
+    padding: 14px 10px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    text-align: left;
+    color: #e2e8f0;
+    vertical-align: middle;
+    /* Force wrapping so strings don't force a horizontal scrollbar */
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.reports-table th {
+    color: #93c5fd;
+    background: rgba(15, 23, 42, 0.9);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* We don't need ellipsis anymore since word-break handles it automatically, but we can keep the class just in case */
+.indicator-cell {
+    white-space: normal;
+    word-break: break-word;
+}
+
+.report-count-badge {
+    display: inline-flex;
+    min-width: 34px;
+    height: 28px;
+    padding: 0 10px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: #f8fafc;
+    background: rgba(34, 211, 238, 0.18);
+    border: 1px solid rgba(34, 211, 238, 0.38);
+    font-weight: 800;
+}
+
+.status-dropdown {
+    width: 100%;
+    min-width: 160px;
+}
+
+.empty-table {
+    text-align: center !important;
+    color: #94a3b8 !important;
+    padding: 28px !important;
+}
+
+.hidden {
+    display: none !important;
+}
+
+@media (max-width: 900px) {
+    .admin-review-header {
+        flex-direction: column;
+    }
+
+    .admin-review-actions {
+        width: 100%;
+    }
+
+    .admin-action-btn,
+    .admin-review-actions select {
+        width: 100%;
+    }
+}

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Report Malicious Indicator |{% endblock %}
+
+{% block content %}
+<section class="dashboard-screen report-screen">
+    <div class="dashboard-intro">
+        <div class="system-status"><span></span> AUTH REQUIRED</div>
+        <h1>Report <em>Malicious Indicator</em></h1>
+        <p>Submit suspicious URLs, IP addresses, phone numbers, SMS content, or emails to improve detection intelligence.</p>
+    </div>
+
+    <section id="report-auth-required" class="report-auth-card hidden">
+        <i class="fas fa-user-lock"></i>
+        <h2>Login Required</h2>
+        <p>You must be logged in before you can report a malicious indicator.</p>
+        <a href="/login" class="report-login-link">
+            <i class="fas fa-right-to-bracket"></i>
+            Login
+        </a>
+    </section>
+
+    <section id="report-form-panel" class="report-panel hidden">
+        <h2 class="report-section-title">
+            <i class="fas fa-flag"></i>
+            Submit New Report
+        </h2>
+
+        <form id="report-indicator-form" class="report-form" novalidate>
+            <div class="form-group">
+                <label for="indicator-type">Indicator Type</label>
+                <select id="indicator-type" required>
+                    <option value="url">URL</option>
+                    <option value="ip">IP Address</option>
+                    <option value="phone">Phone Number</option>
+                    <option value="sms">SMS Content</option>
+                    <option value="email">Email</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="indicator-value">Indicator Value</label>
+                <input
+                    type="text"
+                    id="indicator-value"
+                    placeholder="Enter the suspicious indicator"
+                    autocomplete="off"
+                    required
+                >
+                <small id="indicator-help-text">Example URL: https://example.com/login</small>
+            </div>
+
+            <button id="report-submit-btn" type="submit" class="report-submit-btn">
+                <i class="fas fa-paper-plane"></i>
+                Submit Report
+            </button>
+
+            <div id="report-message" class="report-message"></div>
+        </form>
+    </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/js/report-indicator.js?v=3"></script>
+{% endblock %}
