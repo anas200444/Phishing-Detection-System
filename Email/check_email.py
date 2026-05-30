@@ -2,9 +2,9 @@ import os
 import sys
 import concurrent.futures
 from urllib.parse import quote, unquote
-
 import dns.resolver
 import requests
+from dotenv import load_dotenv
 
 try:
     from OTXv2 import OTXv2, InvalidAPIKey, NotFound, BadRequest, RetryError
@@ -13,34 +13,24 @@ try:
 except Exception as error:
     OTX_AVAILABLE = False
     OTX_IMPORT_ERROR = str(error)
-
     class InvalidAPIKey(Exception):
         pass
-
     class NotFound(Exception):
         pass
-
     class BadRequest(Exception):
         pass
-
     class RetryError(Exception):
         pass
 
-
-# ============================================================
-# API KEY - plaintext as requested
-# ============================================================
-OTX_API_KEY = "a8d8b1329ba8afe42374251d6932540ecf6efe15b97b1b2e52bb5b68c1b54c93"
-
-
-# ============================================================
-# Paths / AI Analyzer
-# ============================================================
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
 
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
+
+
+load_dotenv(os.path.join(root_dir, ".env"))
+OTX_API_KEY = os.getenv("OTX_API_KEY", "")
 
 BLOCKLIST_FILE = os.path.join(current_dir, "disposable_email_blocklist.txt")
 
@@ -65,11 +55,7 @@ def safe_get_ai_analysis(target, target_type, threat_score, details):
         }
     except Exception:
         return {"impact_analysis": [], "countermeasures": []}
-
-
-# ============================================================
-# Email Helpers
-# ============================================================
+    
 def normalize_email_input(email):
     if not email:
         return ""
@@ -125,9 +111,6 @@ def same_email(value, target):
     return normalize_email_input(value).lower() == normalize_email_input(target).lower()
 
 
-# ============================================================
-# Disposable Email Check
-# ============================================================
 def check_blocklist(domain):
     if not domain or not os.path.exists(BLOCKLIST_FILE):
         return False
@@ -142,10 +125,6 @@ def check_blocklist(domain):
     except Exception:
         return False
 
-
-# ============================================================
-# SPF / DMARC Check
-# ============================================================
 def make_dns_resolver():
     resolver = dns.resolver.Resolver()
     resolver.timeout = 3
@@ -177,9 +156,6 @@ def check_dns_records(domain):
     return spf_found, dmarc_found
 
 
-# ============================================================
-# StopForumSpam Exact Email Check
-# ============================================================
 def check_stopforumspam(email, session=None):
     result = {
         "is_flagged": False,
@@ -199,15 +175,7 @@ def check_stopforumspam(email, session=None):
             timeout=5
         )
 
-        if response.status_code != 200:
-            result["error"] = f"API HTTP Error: {response.status_code}"
-            return result
-
         data = response.json()
-
-        if data.get("success") != 1:
-            result["error"] = "StopForumSpam returned unsuccessful response."
-            return result
 
         email_data = data.get("email", {}) or {}
         appears = int(email_data.get("appears", 0) or 0)
@@ -219,20 +187,11 @@ def check_stopforumspam(email, session=None):
             result["frequency"] = int(email_data.get("frequency", 0) or 0)
             result["confidence"] = int(float(email_data.get("confidence", 0) or 0))
             result["lastseen"] = email_data.get("lastseen", "Unknown") or "Unknown"
-
-    except requests.exceptions.RequestException:
-        result["error"] = "Network connection failed."
-    except ValueError:
-        result["error"] = "Failed to parse StopForumSpam response."
-    except Exception as error:
-        result["error"] = f"StopForumSpam check failed: {error}"
+    except Exception:pass
 
     return result
 
 
-# ============================================================
-# AlienVault OTX Exact Email Check
-# ============================================================
 def make_otx_result(error=None):
     return {
         "is_flagged": False,
@@ -241,237 +200,139 @@ def make_otx_result(error=None):
         "error": error
     }
 
-
-def get_pulse_id(pulse):
-    if not isinstance(pulse, dict):
-        return ""
-
-    return pulse.get("id") or pulse.get("_id") or pulse.get("pulse_id") or ""
-
-
-def get_pulse_name(pulse):
-    if not isinstance(pulse, dict):
-        return "Unknown Pulse"
-
-    return pulse.get("name") or pulse.get("title") or "Unknown Pulse"
-
-
-def add_pulse(result, pulse):
-    pulse_id = get_pulse_id(pulse)
-    pulse_name = get_pulse_name(pulse)
-
-    if not pulse_id:
-        pulse_id = pulse_name
-
-    for existing in result["pulses"]:
-        if existing["id"] == pulse_id:
-            return
-
-    result["pulses"].append({
-        "id": pulse_id,
-        "name": pulse_name
-    })
-
-
-def parse_direct_otx_response(data, result):
-    if not isinstance(data, dict):
-        return 0
-
-    pulse_info = data.get("pulse_info", {}) or {}
-    pulses = pulse_info.get("pulses", []) or []
-
-    for pulse in pulses:
-        add_pulse(result, pulse)
-
-    try:
-        return int(pulse_info.get("count", len(pulses)) or 0)
-    except Exception:
-        return len(pulses)
-
-
-def search_results_to_list(data):
-    if isinstance(data, dict):
-        results = data.get("results", [])
-        return results if isinstance(results, list) else []
-
-    return data if isinstance(data, list) else []
-
-
-def indicators_to_list(data):
-    if isinstance(data, dict):
-        results = data.get("results", [])
-        return results if isinstance(results, list) else []
-
-    return data if isinstance(data, list) else []
-
-
-def indicator_is_exact_email(indicator, email):
-    if not isinstance(indicator, dict):
-        return False
-
-    value = indicator.get("indicator") or indicator.get("value") or indicator.get("ioc") or ""
-    indicator_type = str(indicator.get("type", "")).lower().strip()
-
-    email_types = {"email", "email_address", "email-address", "e-mail", "mail"}
-
-    if indicator_type and indicator_type not in email_types:
-        return False
-
-    return same_email(value, email)
-
-
-def pulse_has_email(otx, pulse, email):
-    for indicator in pulse.get("indicators", []) or []:
-        if indicator_is_exact_email(indicator, email):
-            return True
-
-    pulse_id = get_pulse_id(pulse)
-
-    if not pulse_id:
-        return False
-
-    try:
-        indicators_data = otx.get_pulse_indicators(
-            pulse_id,
-            include_inactive=True,
-            limit=1000
-        )
-
-        for indicator in indicators_to_list(indicators_data):
-            if indicator_is_exact_email(indicator, email):
-                return True
-    except Exception:
-        return False
-
-    return False
-
-
 def check_alienvault_otx_exact_email(email):
-    if not OTX_AVAILABLE:
-        return make_otx_result(f"OTXv2 library is not available: {OTX_IMPORT_ERROR}")
-
-    if not OTX_API_KEY or OTX_API_KEY == "PASTE_YOUR_ALIENVAULT_OTX_API_KEY_HERE":
-        return make_otx_result("AlienVault OTX API key is not configured.")
 
     result = make_otx_result()
 
     try:
         otx = OTXv2(OTX_API_KEY.strip())
+        encoded_email = quote(email, safe="")
+        
+        def is_exact(ind):
+            if not isinstance(ind, dict): return False
+            ind_type = str(ind.get("type", "")).lower().strip()
+            if ind_type and ind_type not in {"email", "email_address", "email-address", "e-mail", "mail"}:
+                return False
+            val = ind.get("indicator") or ind.get("value") or ind.get("ioc") or ""
+            return same_email(val, email)
 
-        # Fast path: direct exact email indicator lookup.
+        
         try:
-            encoded_email = quote(email, safe="")
             data = otx.get(f"/api/v1/indicators/email/{encoded_email}/general")
-            direct_count = parse_direct_otx_response(data, result)
-
-            if direct_count > 0:
-                result["pulse_count"] = max(direct_count, len(result["pulses"]))
-                result["is_flagged"] = True
-                return result
-
+            if isinstance(data, dict):
+                for p in (data.get("pulse_info", {}).get("pulses", []) or []):
+                    if isinstance(p, dict) and p.get("id"):
+                        result["pulses"].append({
+                            "id": p.get("id"),
+                            "name": p.get("name") or p.get("title") or "Unknown Pulse"
+                        })
         except (NotFound, BadRequest):
             pass
 
-        # Fallback path: search pulses once, then confirm exact email.
         search_data = otx.search_pulses(email, max_results=50)
+        pulses = search_data.get("results", []) if isinstance(search_data, dict) else search_data
+        
+        if isinstance(pulses, list):
+            existing_ids = {p["id"] for p in result["pulses"]}
+            
+            def process_pulse(pulse):
+                if not isinstance(pulse, dict): return None
+                pid = pulse.get("id") or pulse.get("_id") or pulse.get("pulse_id")
+                if not pid or pid in existing_ids: return None
+            
+                if any(is_exact(ind) for ind in (pulse.get("indicators", []) or [])):
+                    return {"id": pid, "name": pulse.get("name") or pulse.get("title") or "Unknown Pulse"}
+                
+                try:
+                    inds_data = otx.get_pulse_indicators(pid, include_inactive=True, limit=500)
+                    inds = inds_data.get("results", []) if isinstance(inds_data, dict) else inds_data
+                    if isinstance(inds, list) and any(is_exact(ind) for ind in inds):
+                        return {"id": pid, "name": pulse.get("name") or pulse.get("title") or "Unknown Pulse"}
+                except Exception:
+                    pass
+                return None
 
-        for pulse in search_results_to_list(search_data):
-            if pulse_has_email(otx, pulse, email):
-                add_pulse(result, pulse)
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                for match in executor.map(process_pulse, pulses):
+                    if match:
+                        result["pulses"].append(match)
 
         result["pulse_count"] = len(result["pulses"])
         result["is_flagged"] = result["pulse_count"] > 0
         return result
 
-    except InvalidAPIKey:
-        return make_otx_result("Invalid AlienVault OTX API key.")
-    except RetryError:
-        return make_otx_result("AlienVault OTX retry limit exceeded. Try again later.")
-    except requests.exceptions.RequestException:
-        return make_otx_result("AlienVault OTX network connection failed.")
-    except Exception as error:
-        return make_otx_result(f"AlienVault OTX lookup failed: {error}")
+    except Exception:pass
 
-
-# ============================================================
-# IP-System-Style Threat Metrics for Email
-# ============================================================
 def calculate_threat_metrics(is_disposable, spf, dmarc, sfs_data, otx_data):
     otx_pulses = int(otx_data.get("pulse_count", 0) or 0)
-    sfs_conf = int(sfs_data.get("confidence", 0) or 0)
+    sfs_conf = float(sfs_data.get("confidence", 0) or 0)
     sfs_freq = int(sfs_data.get("frequency", 0) or 0)
     missing_spf = not spf
     missing_dmarc = not dmarc
 
-    # This email module now follows the same OWASP-derived structure used
-    # by the IP module:
-    #     Final Severity = Threat Confidence x Potential Harm
-    # The factors are adapted for email reputation/authentication evidence.
+  
+    confidence_score = 0.0
 
-    otx_ratio = min(1.0, otx_pulses / 5.0)
-
-    # 1. Threat Confidence score, 0-9.
-    # Meaning: how confident the system is that this email sender is abusive.
-    threat_confidence_score = 0.0
-    threat_confidence_score += otx_ratio * 4.0
-    threat_confidence_score += min(2.4, otx_pulses * 0.8)
-    threat_confidence_score += (sfs_conf / 100.0) * 1.8
-    threat_confidence_score += min(1.2, sfs_freq / 25.0)
+    if sfs_conf > 0:
+        confidence_score = (sfs_conf / 100.0) * 9.0  
+        
+    if otx_pulses >= 5:
+        confidence_score = max(confidence_score, 9.0)
+    elif otx_pulses >= 3:
+        confidence_score = max(confidence_score, 7.5)
+    elif otx_pulses == 2:
+        confidence_score = max(confidence_score, 5.5) 
+    elif otx_pulses == 1:
+        confidence_score = max(confidence_score, 4.0)
 
     if is_disposable:
-        threat_confidence_score += 1.2
-    if missing_spf:
-        threat_confidence_score += 0.4
-    if missing_dmarc:
-        threat_confidence_score += 0.4
-    if otx_pulses >= 2:
-        threat_confidence_score += 0.8
+        confidence_score = max(confidence_score, 5.0)
+
+    if missing_spf and missing_dmarc:
+        confidence_score += 1.5
+    elif missing_spf or missing_dmarc:
+        confidence_score += 0.5
+
+    confidence_score = min(9.0, max(0.0, confidence_score))
+
+    harm_score = 1.0  
+
+    
     if otx_pulses >= 5:
-        threat_confidence_score += 0.8
+        harm_score = 9.0
+    elif otx_pulses >= 3:
+        harm_score = 7.0
+    elif otx_pulses == 2:
+        harm_score = 5 
+    elif otx_pulses == 1:
+        harm_score = 4.0  
 
-    if (
-        otx_pulses == 0
-        and sfs_conf == 0
-        and sfs_freq == 0
-        and not is_disposable
-        and spf
-        and dmarc
-    ):
-        threat_confidence_score = 0.5
+    if sfs_freq >= 100:
+        harm_score = max(harm_score, 9.0)
+    elif sfs_freq >= 50:
+        harm_score = max(harm_score, 7.5)
+    elif sfs_freq >= 10:
+        harm_score = max(harm_score, 5.0)
+    elif sfs_freq > 0:
+        harm_score = max(harm_score, 3.0)
 
-    threat_confidence_score = min(9.0, threat_confidence_score)
+    if is_disposable:
+        harm_score = max(harm_score, 4.5)
 
-    # 2. Potential Harm score, 0-9.
-    # Meaning: generic harm if this email sender is malicious.
-    # This is not organization-specific business impact.
-    if (
-        otx_pulses >= 5
-        or (otx_pulses >= 2 and sfs_conf >= 50)
-        or (sfs_conf >= 90 and sfs_freq >= 50)
-        or (is_disposable and (missing_spf or missing_dmarc) and sfs_conf >= 50)
-    ):
-        potential_harm_score = 7.5
-    elif otx_pulses >= 2 or sfs_conf >= 70 or sfs_freq >= 50 or is_disposable:
-        potential_harm_score = 6.0
-    elif otx_pulses == 1 or sfs_conf > 0 or sfs_freq > 0 or missing_spf or missing_dmarc:
-        potential_harm_score = 4.0
-    else:
-        potential_harm_score = 2.0
+    if missing_spf and missing_dmarc:
+        harm_score = max(harm_score, 6.0)
 
-    # OWASP threshold style: 0-<3 Low, 3-<6 Medium, 6-9 High.
-    def scale_level(score):
-        if score < 3:
-            return 1
-        if score < 6:
-            return 2
-        return 3
+    harm_score = min(9.0, max(0.0, harm_score))
 
-    threat_confidence_level = scale_level(threat_confidence_score)
-    potential_harm_level = scale_level(potential_harm_score)
+    def get_level(score):
+        if score < 3.0: return 1 
+        if score < 6.0: return 2 
+        return 3                  
 
-    # OWASP-derived severity matrix.
-    # Format: (Threat Confidence, Potential Harm)
-    # 1 = Low, 2 = Medium, 3 = High
+    conf_level = get_level(confidence_score)
+    harm_level = get_level(harm_score)
+
     risk_matrix = {
         (3, 3): "Critical",
         (3, 2): "High",
@@ -483,83 +344,50 @@ def calculate_threat_metrics(is_disposable, spf, dmarc, sfs_data, otx_data):
         (1, 2): "Low",
         (1, 1): "Note"
     }
+    
+    risk_label = risk_matrix.get((conf_level, harm_level), "Note")
 
-    risk_label = risk_matrix.get(
-        (threat_confidence_level, potential_harm_level),
-        "Note"
-    )
-
-    # 0-100 UI score derived from the two matrix inputs.
-    threat_score = min(
-        100,
-        int(((threat_confidence_score + potential_harm_score) / 18.0) * 100)
-    )
-
-    # Evidence quality/confidence: how much data the engine had to decide.
-    evidence_confidence = 20
-    if spf or dmarc:
-        evidence_confidence += 15
-    if spf and dmarc:
-        evidence_confidence += 10
-    if otx_data.get("error") is None:
-        evidence_confidence += 20
-    if otx_pulses > 0:
-        evidence_confidence += min(20, 10 + otx_pulses * 2)
-    if sfs_data.get("error") is None:
-        evidence_confidence += 15
-    if sfs_conf > 0:
-        evidence_confidence += min(15, int(sfs_conf * 0.15))
-    if sfs_freq > 0:
-        evidence_confidence += min(5, int(sfs_freq / 10))
-
-    evidence_confidence = min(100, evidence_confidence)
-
-    # Final detection status.
-    if risk_label in ["Critical", "High"] or otx_pulses >= 2 or sfs_conf >= 70:
-        base_status = "MALICIOUS"
-    elif (
-        risk_label == "Medium"
-        or otx_pulses == 1
-        or sfs_conf > 0
-        or sfs_freq > 0
-        or is_disposable
-        or missing_spf
-        or missing_dmarc
-    ):
+ 
+    if risk_label in ["Critical", "High"]:
+        base_status = "PHISHING"
+    elif risk_label == "Medium" or otx_pulses in [1, 2]:
         base_status = "SUSPICIOUS"
     else:
         base_status = "LEGITIMATE"
 
+
+    threat_score = int(((confidence_score + harm_score) / 18.0) * 100)
+    
+    if risk_label == "Critical":
+        threat_score = max(threat_score, 90)
+    elif risk_label == "High":
+        threat_score = max(threat_score, 70)
+    elif risk_label == "Medium":
+        threat_score = max(threat_score, 40)
+
+
+    evidence_confidence = 30
+    if otx_pulses > 0 or sfs_conf > 0: 
+        evidence_confidence += 50
+    if spf or dmarc: 
+        evidence_confidence += 20
+        
+    evidence_confidence = min(100, evidence_confidence)
+
     return (
         threat_score,
-        threat_confidence_level,
-        potential_harm_level,
+        conf_level,
+        harm_level,
         risk_label,
         base_status,
         evidence_confidence
     )
-
-
-# ============================================================
-# Main Email Evaluation
-# ============================================================
 def evaluate_email(email):
     email = normalize_email_input(email)
 
     if not is_valid_email(email):
         return {
             "status": "Invalid Email Format",
-            "is_safe": False,
-            "threat_score": 100,
-            "threat_confidence": 3,
-            "potential_harm": 3,
-            "likelihood": 3,
-            "impact": 3,
-            "risk_label": "High",
-            "severity": "High",
-            "otx_pulse_count": 0,
-            "ai_impact": [],
-            "ai_countermeasures": [],
             "details": ["The provided input is not a valid email address."]
         }
 
@@ -615,14 +443,12 @@ def evaluate_email(email):
 
     if sfs_data.get("is_flagged"):
         details.append(
-            f"StopForumSpam: Flagged in global spammer DBs with {sfs_data.get('confidence', 0)}% spam confidence."
+            f" Flagged in global spammer DBs with {sfs_data.get('confidence', 0)}% spam confidence."
         )
         details.append(
             f"Historical Activity: Reported {sfs_data.get('frequency', 0)} times across threat forums."
         )
         details.append(f"Most recent activity: {sfs_data.get('lastseen', 'Unknown')}")
-    elif sfs_data.get("error"):
-        details.append(f"StopForumSpam: Could not verify ({sfs_data.get('error')}).")
     else:
         details.append("StopForumSpam: Clear (No known threats found).")
 
@@ -639,9 +465,8 @@ def evaluate_email(email):
 
         if pulse_names:
             details.append("AlienVault OTX Pulse Names: " + " | ".join(pulse_names[:5]))
-
     elif otx_data.get("error"):
-        details.append(f"AlienVault OTX Exact Email: Could not verify ({otx_data.get('error')}).")
+        details.append(f"AlienVault OTX Exact Email: {otx_data.get('error')}.")
     else:
         details.append("AlienVault OTX Exact Email: Clear (0 confirmed pulses found).")
 

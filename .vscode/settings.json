@@ -5,6 +5,7 @@
         "./Email",
         "./IP Address",
         "./URL",
-        "./IP_Address"
+        "./IP_Address",
+        "./SMS"
     ]
 }

@@ -1,3 +1,4 @@
+import os
 import base64
 import socket
 import urllib.parse
@@ -6,14 +7,22 @@ import requests
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
+from dotenv import load_dotenv
 from url_utils import normalize_url_for_vt, ensure_url_scheme, extract_domain, get_base_domain
 
-try: import whois
-except: whois = None
+try: 
+    import whois
+except ImportError: 
+    whois = None
 
-VT_API_KEY = "fb9ed8979176bc743716b6736bba75ddce368e7fd06f129517ff8b10e452bd9c"
-GSB_API_KEY = "AIzaSyDwjly0YEpTNYtxg9qNcgTgvXT1HS3eU"
-OTX_API_KEY = "a8d8b1329ba8afe42374251d6932540ecf6efe15b97b1b2e52bb5b68c1b54c93"
+# Securely load environment variables
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(current_dir)
+load_dotenv(os.path.join(root_dir, ".env"))
+
+VT_API_KEY = os.getenv("VIRUSTOTAL_API_KEY", "")
+GSB_API_KEY = os.getenv("GSB_API_KEY", "")
+OTX_API_KEY = os.getenv("OTX_API_KEY", "")
 
 VT_HEADERS = {"accept": "application/json", "x-apikey": VT_API_KEY}
 OTX_HEADERS = {"X-OTX-API-KEY": OTX_API_KEY, "Accept": "application/json"}
